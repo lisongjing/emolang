@@ -120,7 +120,9 @@ impl Lexer {
 fn handle_two_chars_token(chars: &[&str], pos: &mut usize) -> Token {
     let first_char = chars[*pos];
     let mut literal = String::from(first_char);
-    literal.push_str(chars[*pos + 1]);
+    if *pos < chars.len() - 1 {
+        literal.push_str(chars[*pos + 1]);
+    }
     match &*literal {
         "❗🟰" => {
             *pos += 1;
@@ -143,17 +145,17 @@ fn handle_two_chars_token(chars: &[&str], pos: &mut usize) -> Token {
 
 fn handle_string(chars: &[&str], pos: &mut usize) -> Token {
     let mut literal = String::new();
-    *pos += 1;
-    while chars[*pos] != "💬" {
-        literal.push_str(chars[*pos]);
+    while *pos < chars.len() - 1 && chars[*pos + 1] != "💬" {
         *pos += 1;
+        literal.push_str(chars[*pos]);
     }
+    *pos += 1;
     Token::from(TokenType::String, literal)
 }
 
 fn handle_number(chars: &[&str], pos: &mut usize) -> Token {
     let mut literal = String::from(chars[*pos]);
-    while DIGITALS.contains(&chars[*pos + 1]) || DOTS.contains(&chars[*pos + 1]) {
+    while *pos < chars.len() - 1 && (DIGITALS.contains(&chars[*pos + 1]) || DOTS.contains(&chars[*pos + 1])) {
         *pos += 1;
         literal.push_str(chars[*pos]);
     }
@@ -162,7 +164,7 @@ fn handle_number(chars: &[&str], pos: &mut usize) -> Token {
 
 fn handle_identifier(chars: &[&str], pos: &mut usize) -> Token {
     let mut literal = String::from(chars[*pos]);
-    while is_identifier_char(chars[*pos + 1]) {
+    while *pos < chars.len() - 1 && is_identifier_char(chars[*pos + 1]) {
         *pos += 1;
         literal.push_str(chars[*pos]);
     }
