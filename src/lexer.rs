@@ -52,9 +52,7 @@ const RESERVED_SYMBOLS: [&str; 29] = [
     "⬅️", "➕", "➖", "✖️", "➗", "〰️", "🟰", "▶️", "◀️", "🔁", "🔀", "⏸️", "↙️", "🦶", "🌜", "🌛",
     "👉", "👈", "🫸", "🫷", "🗨️", "💬", "✔️", "❌", "❓", "❗", "⭕", "📛", "🔙",
 ];
-const DIGITALS: [&str; 11] = [
-    "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟",
-];
+const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
 const SPACES: [&str; 4] = [" ", "\t", "\r", "\n"];
 
@@ -136,9 +134,9 @@ fn handle_two_chars_token(chars: &[&str], pos: &mut usize) -> Token {
             *pos += 1;
             Token::from(TokenType::LessThanOrEqual, literal)
         }
-        _ if first_char == "❗" => Token::from(TokenType::Else, literal),
-        _ if first_char == "▶️" => Token::from(TokenType::GreaterThan, literal),
-        _ if first_char == "◀️" => Token::from(TokenType::LessThan, literal),
+        _ if first_char == "❗" => Token::from_str(TokenType::Else, first_char),
+        _ if first_char == "▶️" => Token::from_str(TokenType::GreaterThan, first_char),
+        _ if first_char == "◀️" => Token::from_str(TokenType::LessThan, first_char),
         _ => Token::from_str(TokenType::Illegal, first_char),
     }
 }
@@ -203,11 +201,23 @@ mod lexer_test {
 
     #[test]
     fn test() {
-        let source = String::from("㊙️🔢 ⬅️ 3️⃣ ✖️ 2️⃣ ↙️ ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
+        let source = String::from(
+        "
+        ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
+        ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
+        📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
+          ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
+            🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
+            🅱️ ⬅️ 🅱️ ➖ 🅰️ ↙️
+          🫷
+          🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
+        🫷
+        ",
+        );
         let target = vec![
             Token::from_str(TokenType::Identifier, "㊙️🔢"),
             Token::from_str(TokenType::Assign, "⬅️"),
-            Token::from_str(TokenType::Number, "3️⃣"),
+            Token::from_str(TokenType::Number, "3️⃣⚪9️⃣"),
             Token::from_str(TokenType::Multiply, "✖️"),
             Token::from_str(TokenType::Number, "2️⃣"),
             Token::from_str(TokenType::Semicolon, "↙️"),
@@ -215,6 +225,50 @@ mod lexer_test {
             Token::from_str(TokenType::Assign, "⬅️"),
             Token::from_str(TokenType::String, "🈶🅰️🈚🅱️🈲🆎"),
             Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::Function, "📛"),
+            Token::from_str(TokenType::Identifier, "🈯"),
+            Token::from_str(TokenType::LParenthesis, "🌜"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::Comma, "🦶"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::RParenthesis, "🌛"),
+            Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::While, "⭕"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::GreaterThanOrEqual, "▶️🟰"),
+            Token::from_str(TokenType::Number, "0️⃣"),
+            Token::from_str(TokenType::And, "🔁"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::LessThanOrEqual, "◀️🟰"),
+            Token::from_str(TokenType::Number, "5️⃣"),
+            Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::Assign, "⬅️"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::Plus, "➕"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::Assign, "⬅️"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::Minus, "➖"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Return, "🔙"),
+            Token::from_str(TokenType::If, "❓"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::GreaterThan, "▶️"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Else, "❗"),
+            Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Identifier, "🅱️"),
+            Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::RBrace, "🫷"),
             Token::from(TokenType::End, String::new()),
         ];
         let lexer = Lexer::new(source);
