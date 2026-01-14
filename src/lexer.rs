@@ -11,16 +11,25 @@ enum TokenType {
     Minus,
     Multiply,
     Divide,
+    Modulo,
 
     Equal,
+    NotEqual,
     GreaterThan,
+    GreaterThanOrEqual,
     LessThan,
+    LessThanOrEqual,
 
     And,
     Or,
     Not,
 
+    Comma,
     Semicolon,
+    LParenthesis,
+    RParenthesis,
+    LBracket,
+    RBracket,
     LBrace,
     RBrace,
 
@@ -29,13 +38,19 @@ enum TokenType {
     True,
     False,
 
+    If,
+    Else,
+    While,
+    Function,
+    Return,
+
     Number,
     String,
 }
 
-const SYMBOLS: [&str; 18] = [
-    "⬅️", "➕", "➖", "✖️", "➗", "🟰", "▶️", "◀️", "🔁", "🔀", "⏸️", "↙️", "👉", "👈", "🗨️", "💬",
-    "✔️", "❌",
+const RESERVED_SYMBOLS: [&str; 29] = [
+    "⬅️", "➕", "➖", "✖️", "➗", "〰️", "🟰", "▶️", "◀️", "🔁", "🔀", "⏸️", "↙️", "🦶", "🌜", "🌛",
+    "👉", "👈", "🫸", "🫷", "🗨️", "💬", "✔️", "❌", "❓", "❗", "⭕", "📛", "🔙",
 ];
 const DIGITALS: [&str; 11] = [
     "0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟",
@@ -65,17 +80,28 @@ impl Lexer {
                 "➖" => Token::from_str(TokenType::Minus, char),
                 "✖️" => Token::from_str(TokenType::Multiply, char),
                 "➗" => Token::from_str(TokenType::Divide, char),
+                "〰️" => Token::from_str(TokenType::Modulo, char),
                 "🟰" => Token::from_str(TokenType::Equal, char),
-                "▶️" => Token::from_str(TokenType::GreaterThan, char),
-                "◀️" => Token::from_str(TokenType::LessThan, char),
+                "▶️" => handle_two_chars_token(&chars, &mut pos),
+                "◀️" => handle_two_chars_token(&chars, &mut pos),
                 "🔁" => Token::from_str(TokenType::And, char),
                 "🔀" => Token::from_str(TokenType::Or, char),
                 "⏸️" => Token::from_str(TokenType::Not, char),
                 "↙️" => Token::from_str(TokenType::Semicolon, char),
                 "✔️" => Token::from_str(TokenType::True, char),
                 "❌" => Token::from_str(TokenType::False, char),
-                "👉" => Token::from_str(TokenType::LBrace, char),
-                "👈" => Token::from_str(TokenType::RBrace, char),
+                "❓" => Token::from_str(TokenType::If, char),
+                "❗" => handle_two_chars_token(&chars, &mut pos),
+                "⭕" => Token::from_str(TokenType::While, char),
+                "📛" => Token::from_str(TokenType::Function, char),
+                "🔙" => Token::from_str(TokenType::Return, char),
+                "🦶" => Token::from_str(TokenType::Comma, char),
+                "🌜" => Token::from_str(TokenType::LParenthesis, char),
+                "🌛" => Token::from_str(TokenType::RParenthesis, char),
+                "👉" => Token::from_str(TokenType::LBracket, char),
+                "👈" => Token::from_str(TokenType::RBracket, char),
+                "🫸" => Token::from_str(TokenType::LBrace, char),
+                "🫷" => Token::from_str(TokenType::RBrace, char),
                 "🗨️" => handle_string(&chars, &mut pos),
                 _ if DIGITALS.contains(&char) => handle_number(&chars, &mut pos),
                 _ if SPACES.contains(&char) => {
@@ -90,6 +116,30 @@ impl Lexer {
         }
         tokens.push(Token::from(TokenType::End, String::new()));
         tokens
+    }
+}
+
+fn handle_two_chars_token(chars: &[&str], pos: &mut usize) -> Token {
+    let first_char = chars[*pos];
+    let mut literal = String::from(first_char);
+    literal.push_str(chars[*pos + 1]);
+    match &*literal {
+        "❗🟰" => {
+            *pos += 1;
+            Token::from(TokenType::NotEqual, literal)
+        }
+        "▶️🟰" => {
+            *pos += 1;
+            Token::from(TokenType::GreaterThanOrEqual, literal)
+        }
+        "◀️🟰" => {
+            *pos += 1;
+            Token::from(TokenType::LessThanOrEqual, literal)
+        }
+        _ if first_char == "❗" => Token::from(TokenType::Else, literal),
+        _ if first_char == "▶️" => Token::from(TokenType::GreaterThan, literal),
+        _ if first_char == "◀️" => Token::from(TokenType::LessThan, literal),
+        _ => Token::from_str(TokenType::Illegal, first_char),
     }
 }
 
@@ -122,7 +172,7 @@ fn handle_identifier(chars: &[&str], pos: &mut usize) -> Token {
 }
 
 fn is_identifier_char(char: &str) -> bool {
-    !SYMBOLS.contains(&char)
+    !RESERVED_SYMBOLS.contains(&char)
         && !DIGITALS.contains(&char)
         && !DOTS.contains(&char)
         && !SPACES.contains(&char)
