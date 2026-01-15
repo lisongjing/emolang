@@ -54,7 +54,7 @@ const RESERVED_SYMBOLS: [&str; 29] = [
 ];
 const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
-const SPACES: [&str; 4] = [" ", "\t", "\r", "\n"];
+const SPACES: [&str; 5] = [" ", "\t", "\r", "\n", "\r\n"];
 
 pub struct Lexer {
     input: String,
