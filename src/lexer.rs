@@ -214,6 +214,7 @@ mod lexer_test {
           🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
+        🅰️🅱️
         ",
         );
         let target = vec![
@@ -271,6 +272,7 @@ mod lexer_test {
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Identifier, "🅰️🅱️"),
             Token::from(TokenType::End, String::new()),
         ];
         let lexer = Lexer::new(source);
