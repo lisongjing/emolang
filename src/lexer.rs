@@ -1,7 +1,7 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Debug, PartialEq)]
-enum TokenType {
+#[derive(Debug, PartialEq, Clone)]
+pub enum TokenType {
     Illegal,
     End,
 
@@ -178,10 +178,10 @@ fn is_identifier_char(char: &str) -> bool {
         && !SPACES.contains(&char)
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Token {
-    token_type: TokenType,
-    literal: String,
+    pub token_type: TokenType,
+    pub literal: String,
 }
 
 impl Token {
