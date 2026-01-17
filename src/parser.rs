@@ -6,6 +6,7 @@ pub trait Expression {
 
 pub struct Program {
     expressions: Vec<Box<dyn Expression>>,
+    errors: Vec<String>,
 }
 
 impl Expression for Program {
@@ -50,16 +51,18 @@ impl Parser {
     }
 
     pub fn parse_program(&self) -> Program {
-        let mut program = Program { expressions: vec![] };
+        let mut program = Program { expressions: vec![], errors: vec![] };
         let tokens = self.lexer.tokenize();
         let mut pos = 0usize;
 
         while pos < tokens.len() {
-            if let Ok(expression) = match tokens[pos].token_type {
+            let expression_result = match &tokens[pos].token_type {
                 TokenType::Assign => parse_assign_expression(&tokens, &mut pos),
-                _ => Err(String::from("Unkown token"))
-            } {
-                program.expressions.push(Box::new(expression));
+                token => Err(format!("Unkown token {token:?}"))
+            };
+            match expression_result {
+                Ok(expression) => program.expressions.push(Box::new(expression)),
+                Err(error_msg) => program.errors.push(error_msg),
             }
             pos += 1;
         }
@@ -73,7 +76,7 @@ fn parse_assign_expression(tokens: &[Token], pos: &mut usize) -> Result<AssignEx
     let identifier = if *pos > 0 && tokens[*pos - 1].token_type == TokenType::Identifier {
         Ok(Identifier { token: tokens[*pos - 1].clone(), value: tokens[*pos - 1].clone().literal })
     } else {
-        Err(String::from("Missing Identifier before ⬅️"))
+        Err(String::from("Expected variable name before ⬅️"))
     }?;
     *pos += 1;
     while tokens[*pos].token_type != TokenType::Semicolon {
@@ -91,6 +94,7 @@ mod parser_test {
         let source = String::from(
             "
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
+        ⬅️ 3️⃣ ↙️
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
         ",
         );
