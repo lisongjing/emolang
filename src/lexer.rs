@@ -56,6 +56,29 @@ const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️�
 const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
 const SPACES: [&str; 5] = [" ", "\t", "\r", "\n", "\r\n"];
 
+#[derive(Debug, PartialEq, Clone)]
+pub struct Token {
+    pub token_type: TokenType,
+    pub literal: String,
+}
+
+impl Token {
+    pub fn from(token_type: TokenType, literal: String) -> Token {
+        Token {
+            token_type,
+            literal,
+        }
+    }
+
+    pub fn from_str(token_type: TokenType, literal: &str) -> Token {
+        Self::from(token_type, String::from(literal))
+    }
+
+    pub fn end() -> Token {
+        Token::from(TokenType::End, String::new())
+    }
+}
+
 pub struct Lexer {
     input: String,
 }
@@ -112,7 +135,6 @@ impl Lexer {
             pos += 1;
             tokens.push(token);
         }
-        tokens.push(Token::from(TokenType::End, String::new()));
         tokens
     }
 }
@@ -178,24 +200,6 @@ fn is_identifier_char(char: &str) -> bool {
         && !SPACES.contains(&char)
 }
 
-#[derive(Debug, PartialEq, Clone)]
-pub struct Token {
-    pub token_type: TokenType,
-    pub literal: String,
-}
-
-impl Token {
-    fn from(token_type: TokenType, literal: String) -> Token {
-        Token {
-            token_type,
-            literal,
-        }
-    }
-
-    fn from_str(token_type: TokenType, literal: &str) -> Token {
-        Self::from(token_type, String::from(literal))
-    }
-}
 
 #[cfg(test)]
 mod lexer_test {
@@ -273,7 +277,6 @@ mod lexer_test {
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Identifier, "🅰️🅱️"),
-            Token::from(TokenType::End, String::new()),
         ];
         let lexer = Lexer::new(source);
         assert_eq!(lexer.tokenize(), target);
