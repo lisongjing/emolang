@@ -51,14 +51,25 @@ impl Parser {
     }
 
     pub fn parse_program(&self) -> Program {
-        let mut program = Program { expressions: vec![], errors: vec![] };
+        let mut program = Program {
+            expressions: vec![],
+            errors: vec![],
+        };
         let tokens = self.lexer.tokenize();
         let mut pos = 0usize;
 
         while pos < tokens.len() {
+            let next_token = if pos < tokens.len() + 1 {
+                &tokens[pos + 1]
+            } else {
+                &Token::end()
+            };
+
             let expression_result = match &tokens[pos].token_type {
-                TokenType::Assign => parse_assign_expression(&tokens, &mut pos),
-                token => Err(format!("Unkown token {token:?}"))
+                TokenType::Identifier if is_next_token(TokenType::Assign, next_token) => {
+                    parse_assign_expression(&tokens, &mut pos)
+                }
+                _ => Err(format!("Unkown syntax {}", tokens[pos].literal)),
             };
             match expression_result {
                 Ok(expression) => program.expressions.push(Box::new(expression)),
@@ -71,18 +82,26 @@ impl Parser {
     }
 }
 
+fn is_next_token(expected_token_type: TokenType, next_token: &Token) -> bool {
+    expected_token_type == next_token.token_type
+}
+
 fn parse_assign_expression(tokens: &[Token], pos: &mut usize) -> Result<AssignExpression, String> {
-    let assign_token = tokens[*pos].clone();
-    let identifier = if *pos > 0 && tokens[*pos - 1].token_type == TokenType::Identifier {
-        Ok(Identifier { token: tokens[*pos - 1].clone(), value: tokens[*pos - 1].clone().literal })
-    } else {
-        Err(String::from("Expected variable name before ⬅️"))
-    }?;
+    let identifier = tokens[*pos].clone();
+    let identifier = Identifier {
+        token: identifier.clone(),
+        value: identifier.literal,
+    };
     *pos += 1;
+    let assign = tokens[*pos].clone();
     while tokens[*pos].token_type != TokenType::Semicolon {
         *pos += 1;
     }
-    Ok(AssignExpression{ token: assign_token, name: identifier, value: None })
+    Ok(AssignExpression {
+        token: assign,
+        name: identifier,
+        value: None,
+    })
 }
 
 #[cfg(test)]
@@ -106,5 +125,6 @@ mod parser_test {
         assert_eq!(program.expressions.len(), 2);
         assert_eq!(program.expressions[0].token_literal(), "⬅️");
         assert_eq!(program.expressions[1].token_literal(), "⬅️");
+        assert_eq!(program.errors.len(), 3);
     }
 }

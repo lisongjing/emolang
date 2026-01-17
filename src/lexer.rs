@@ -177,7 +177,9 @@ fn handle_string(chars: &[&str], pos: &mut usize) -> Token {
 
 fn handle_number(chars: &[&str], pos: &mut usize) -> Token {
     let mut literal = String::from(chars[*pos]);
-    while *pos < chars.len() - 1 && (DIGITALS.contains(&chars[*pos + 1]) || DOTS.contains(&chars[*pos + 1])) {
+    while *pos < chars.len() - 1
+        && (DIGITALS.contains(&chars[*pos + 1]) || DOTS.contains(&chars[*pos + 1]))
+    {
         *pos += 1;
         literal.push_str(chars[*pos]);
     }
@@ -200,7 +202,6 @@ fn is_identifier_char(char: &str) -> bool {
         && !SPACES.contains(&char)
 }
 
-
 #[cfg(test)]
 mod lexer_test {
     use super::*;
@@ -208,7 +209,7 @@ mod lexer_test {
     #[test]
     fn test() {
         let source = String::from(
-        "
+            "
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
