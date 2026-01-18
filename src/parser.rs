@@ -2,6 +2,7 @@ use crate::lexer::{Lexer, Token, TokenType};
 
 pub trait Expression {
     fn token_literal(&self) -> &str;
+    fn string(&self) -> String;
 }
 
 pub struct Program {
@@ -16,6 +17,10 @@ impl Expression for Program {
             .map(|exp| exp.token_literal())
             .unwrap_or_default()
     }
+
+    fn string(&self) -> String {
+        self.expressions.iter().map(|exp| exp.string()).collect()
+    }
 }
 
 pub struct Identifier {
@@ -26,6 +31,10 @@ pub struct Identifier {
 impl Expression for Identifier {
     fn token_literal(&self) -> &str {
         &self.token.literal
+    }
+    
+    fn string(&self) -> String {
+        self.value.clone()
     }
 }
 
@@ -38,6 +47,10 @@ pub struct AssignExpression {
 impl Expression for AssignExpression {
     fn token_literal(&self) -> &str {
         &self.token.literal
+    }
+    
+    fn string(&self) -> String {
+        format!("{} {} {} ↙️", self.name.string(), self.token.literal, self.value.as_ref().map(|exp| exp.string()).unwrap_or_default())
     }
 }
 
