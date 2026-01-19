@@ -1,5 +1,15 @@
 use crate::lexer::{Lexer, Token, TokenType};
 
+pub enum Precedence {
+    Lowest,
+    Equals,      // 🟰/❗🟰
+    LessGreater, // ▶️/▶️🟰/◀️/◀️🟰
+    Plus,        // ➕/➖
+    Product,     // ✖️/➗/〰️
+    Prefix,      // ➖x/⏸️x
+    Call,        // fn🌜🌛
+}
+
 pub trait Expression {
     fn token_literal(&self) -> &str;
     fn string(&self) -> String;
@@ -7,7 +17,6 @@ pub trait Expression {
 
 pub struct Program {
     expressions: Vec<Box<dyn Expression>>,
-    errors: Vec<String>,
 }
 
 impl Expression for Program {
@@ -56,17 +65,17 @@ impl Expression for AssignExpression {
 
 pub struct Parser {
     lexer: Lexer,
+    errors: Vec<String>,
 }
 
 impl Parser {
     pub fn new(lexer: Lexer) -> Parser {
-        Parser { lexer }
+        Parser { lexer, errors: vec![] }
     }
 
-    pub fn parse_program(&self) -> Program {
+    pub fn parse_program(&mut self) -> Program {
         let mut program = Program {
             expressions: vec![],
-            errors: vec![],
         };
         let tokens = self.lexer.tokenize();
         let mut pos = 0usize;
@@ -79,14 +88,14 @@ impl Parser {
             };
 
             let expression_result = match &tokens[pos].token_type {
-                TokenType::Identifier if is_next_token(TokenType::Assign, next_token) => {
+                TokenType::Identifier if is_token_type(TokenType::Assign, next_token) => {
                     parse_assign_expression(&tokens, &mut pos)
                 }
                 _ => Err(format!("Unkown syntax {}", tokens[pos].literal)),
             };
             match expression_result {
                 Ok(expression) => program.expressions.push(Box::new(expression)),
-                Err(error_msg) => program.errors.push(error_msg),
+                Err(error_msg) => self.errors.push(error_msg),
             }
             pos += 1;
         }
@@ -95,8 +104,8 @@ impl Parser {
     }
 }
 
-fn is_next_token(expected_token_type: TokenType, next_token: &Token) -> bool {
-    expected_token_type == next_token.token_type
+fn is_token_type(expected_token_type: TokenType, token: &Token) -> bool {
+    expected_token_type == token.token_type
 }
 
 fn parse_assign_expression(tokens: &[Token], pos: &mut usize) -> Result<AssignExpression, String> {
@@ -132,12 +141,12 @@ mod parser_test {
         );
 
         let lexer = Lexer::new(source);
-        let parser = Parser::new(lexer);
+        let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
         assert_eq!(program.expressions.len(), 2);
         assert_eq!(program.expressions[0].token_literal(), "⬅️");
         assert_eq!(program.expressions[1].token_literal(), "⬅️");
-        assert_eq!(program.errors.len(), 3);
+        assert_eq!(parser.errors.len(), 3);
     }
 }
