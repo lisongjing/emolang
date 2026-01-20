@@ -10,25 +10,29 @@ pub enum Precedence {
     Call,        // fn🌜🌛
 }
 
-pub trait Expression {
+pub trait Node {
     fn token_literal(&self) -> &str;
     fn string(&self) -> String;
 }
 
+pub trait Statement: Node {}
+
+pub trait Expression: Node {}
+
 pub struct Program {
-    expressions: Vec<Box<dyn Expression>>,
+    statements: Vec<Box<dyn Statement>>,
 }
 
-impl Expression for Program {
+impl Node for Program {
     fn token_literal(&self) -> &str {
-        self.expressions
+        self.statements
             .first()
-            .map(|exp| exp.token_literal())
+            .map(|stmt| stmt.token_literal())
             .unwrap_or_default()
     }
 
     fn string(&self) -> String {
-        self.expressions.iter().map(|exp| exp.string()).collect()
+        self.statements.iter().map(|stmt| stmt.string()).collect()
     }
 }
 
@@ -37,7 +41,7 @@ pub struct Identifier {
     value: String,
 }
 
-impl Expression for Identifier {
+impl Node for Identifier {
     fn token_literal(&self) -> &str {
         &self.token.literal
     }
@@ -47,13 +51,15 @@ impl Expression for Identifier {
     }
 }
 
-pub struct AssignExpression {
+impl Expression for Identifier {}
+
+pub struct AssignStatement {
     token: Token,
     name: Identifier,
     value: Option<Box<dyn Expression>>,
 }
 
-impl Expression for AssignExpression {
+impl Node for AssignStatement {
     fn token_literal(&self) -> &str {
         &self.token.literal
     }
@@ -62,6 +68,42 @@ impl Expression for AssignExpression {
         format!("{} {} {} ↙️", self.name.string(), self.token.literal, self.value.as_ref().map(|exp| exp.string()).unwrap_or_default())
     }
 }
+
+impl Statement for AssignStatement {}
+
+pub struct ReturnStatement {
+    token: Token,
+    value: Option<Box<dyn Expression>>,
+}
+
+impl Node for ReturnStatement {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+    
+    fn string(&self) -> String {
+        format!("{} {} ↙️", self.token.literal, self.value.as_ref().map(|exp| exp.string()).unwrap_or_default())
+    }
+}
+
+impl Statement for ReturnStatement {}
+
+pub struct ExpressionStatement {
+    token: Token,
+    expression: Option<Box<dyn Expression>>,
+}
+
+impl Node for ExpressionStatement {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+    
+    fn string(&self) -> String {
+        self.expression.as_ref().map(|exp| exp.string()).unwrap_or_default()
+    }
+}
+
+impl Statement for ExpressionStatement {}
 
 pub struct Parser {
     lexer: Lexer,
@@ -75,7 +117,7 @@ impl Parser {
 
     pub fn parse_program(&mut self) -> Program {
         let mut program = Program {
-            expressions: vec![],
+            statements: vec![],
         };
         let tokens = self.lexer.tokenize();
         let mut pos = 0usize;
@@ -87,14 +129,15 @@ impl Parser {
                 &Token::end()
             };
 
-            let expression_result = match &tokens[pos].token_type {
+            let statement = match &tokens[pos].token_type {
                 TokenType::Identifier if is_token_type(TokenType::Assign, next_token) => {
-                    parse_assign_expression(&tokens, &mut pos)
+                    parse_assign_statement(&tokens, &mut pos)
                 }
-                _ => Err(format!("Unkown syntax {}", tokens[pos].literal)),
+                TokenType::Return => parse_return_statement(&tokens, &mut pos),
+                _ => parse_expression_statement(&tokens, &mut pos),
             };
-            match expression_result {
-                Ok(expression) => program.expressions.push(Box::new(expression)),
+            match statement {
+                Ok(statement) => program.statements.push(statement),
                 Err(error_msg) => self.errors.push(error_msg),
             }
             pos += 1;
@@ -108,23 +151,45 @@ fn is_token_type(expected_token_type: TokenType, token: &Token) -> bool {
     expected_token_type == token.token_type
 }
 
-fn parse_assign_expression(tokens: &[Token], pos: &mut usize) -> Result<AssignExpression, String> {
+fn parse_assign_statement(tokens: &[Token], pos: &mut usize) -> Result<Box<dyn Statement>, String> {
     let identifier = tokens[*pos].clone();
     let identifier = Identifier {
         token: identifier.clone(),
         value: identifier.literal,
     };
     *pos += 1;
-    let assign = tokens[*pos].clone();
+    let assign_token = tokens[*pos].clone();
     while tokens[*pos].token_type != TokenType::Semicolon {
         *pos += 1;
     }
-    Ok(AssignExpression {
-        token: assign,
+    Ok(Box::new(AssignStatement {
+        token: assign_token,
         name: identifier,
         value: None,
-    })
+    }))
 }
+
+fn parse_return_statement(tokens: &[Token], pos: &mut usize) -> Result<Box<dyn Statement>, String> {
+    let return_token = tokens[*pos].clone();
+    *pos += 1;
+    while tokens[*pos].token_type != TokenType::Semicolon {
+        *pos += 1;
+    }
+    Ok(Box::new(ReturnStatement {
+        token: return_token,
+        value: None,
+    }))
+}
+
+fn parse_expression_statement(tokens: &[Token], pos: &mut usize) -> Result<Box<dyn Statement>, String> {
+    let exp_token = tokens[*pos].clone();
+
+    Ok(Box::new(ExpressionStatement {
+        token: exp_token,
+        expression: None,
+    }))
+}
+
 
 #[cfg(test)]
 mod parser_test {
@@ -144,9 +209,9 @@ mod parser_test {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.expressions.len(), 2);
-        assert_eq!(program.expressions[0].token_literal(), "⬅️");
-        assert_eq!(program.expressions[1].token_literal(), "⬅️");
+        assert_eq!(program.statements.len(), 2);
+        assert_eq!(program.statements[0].token_literal(), "⬅️");
+        assert_eq!(program.statements[1].token_literal(), "⬅️");
         assert_eq!(parser.errors.len(), 3);
     }
 }
