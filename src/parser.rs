@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::lexer::{Lexer, Token, TokenType};
 
 pub enum Precedence {
@@ -35,23 +37,6 @@ impl Node for Program {
         self.statements.iter().map(|stmt| stmt.string()).collect()
     }
 }
-
-pub struct Identifier {
-    token: Token,
-    value: String,
-}
-
-impl Node for Identifier {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-    
-    fn string(&self) -> String {
-        self.value.clone()
-    }
-}
-
-impl Expression for Identifier {}
 
 pub struct AssignStatement {
     token: Token,
@@ -105,14 +90,40 @@ impl Node for ExpressionStatement {
 
 impl Statement for ExpressionStatement {}
 
+pub struct Identifier {
+    token: Token,
+    value: String,
+}
+
+impl Node for Identifier {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+    
+    fn string(&self) -> String {
+        self.value.clone()
+    }
+}
+
+impl Expression for Identifier {}
+
+type PrefixParser = Box<dyn Fn(&[Token], &mut usize) -> Box<dyn Expression>>;
+type InfixParser = Box<dyn Fn(&[Token], &mut usize, Box<dyn Expression>) -> Box<dyn Expression>>;
+
 pub struct Parser {
     lexer: Lexer,
     errors: Vec<String>,
+    prefix_exp_parsers: HashMap<TokenType, PrefixParser>,
+    infix_exp_parsers: HashMap<TokenType, InfixParser>,
 }
 
 impl Parser {
     pub fn new(lexer: Lexer) -> Parser {
-        Parser { lexer, errors: vec![] }
+        let mut prefix_exp_parsers = HashMap::new();
+        let identifier_parser: PrefixParser = Box::new(parse_identifier);
+        prefix_exp_parsers.insert(TokenType::Identifier, identifier_parser);
+
+        Parser { lexer, errors: vec![], prefix_exp_parsers, infix_exp_parsers: HashMap::new() }
     }
 
     pub fn parse_program(&mut self) -> Program {
@@ -184,10 +195,18 @@ fn parse_return_statement(tokens: &[Token], pos: &mut usize) -> Result<Box<dyn S
 fn parse_expression_statement(tokens: &[Token], pos: &mut usize) -> Result<Box<dyn Statement>, String> {
     let exp_token = tokens[*pos].clone();
 
+    if *pos < tokens.len() - 1 && is_token_type(TokenType::Semicolon, &tokens[*pos + 1]) {
+        *pos += 1;
+    }
+
     Ok(Box::new(ExpressionStatement {
         token: exp_token,
         expression: None,
     }))
+}
+
+fn parse_identifier(tokens: &[Token], pos: &mut usize) -> Box<dyn Expression> {
+    Box::new(Identifier { token: tokens[*pos].clone(), value: tokens[*pos].literal.clone() })
 }
 
 

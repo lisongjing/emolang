@@ -1,6 +1,6 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum TokenType {
     Illegal,
     End,
