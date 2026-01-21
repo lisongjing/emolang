@@ -1,5 +1,7 @@
 use unicode_segmentation::UnicodeSegmentation;
 
+use crate::util::StatefulVector;
+
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum TokenType {
     Illegal,
@@ -79,23 +81,21 @@ impl Token {
     }
 }
 
-pub struct Lexer {
-    input: String,
+pub struct Lexer<'a> {
+    input: &'a str,
+    chars: StatefulVector<&'a str>,
 }
 
-impl Lexer {
-    pub fn new(input: String) -> Lexer {
-        Lexer { input }
+impl <'a> Lexer<'a> {
+    pub fn new(input: &'a str) -> Lexer<'a> {
+        Lexer { input, chars: StatefulVector::from_vec(input.graphemes(true).collect::<Vec<&str>>()) }
     }
 
-    pub fn tokenize(&self) -> Vec<Token> {
-        let chars = self.input.graphemes(true).collect::<Vec<&str>>();
-        let mut pos = 0usize;
-        let mut tokens = vec![];
+    pub fn tokenize(&mut self) -> StatefulVector<Token> {
+        let mut tokens = StatefulVector::<Token>::new();
 
-        while pos < chars.len() {
-            let char = chars[pos];
-            let token = match char {
+        while let Some(char) = self.chars.next() {
+            let token = match *char {
                 "⬅️" => Token::from_str(TokenType::Assign, char),
                 "➕" => Token::from_str(TokenType::Plus, char),
                 "➖" => Token::from_str(TokenType::Minus, char),
@@ -103,8 +103,8 @@ impl Lexer {
                 "➗" => Token::from_str(TokenType::Divide, char),
                 "〰️" => Token::from_str(TokenType::Modulo, char),
                 "🟰" => Token::from_str(TokenType::Equal, char),
-                "▶️" => handle_two_chars_token(&chars, &mut pos),
-                "◀️" => handle_two_chars_token(&chars, &mut pos),
+                "▶️" => self.handle_two_chars_token(TokenType::GreaterThan, "🟰", TokenType::GreaterThanOrEqual),
+                "◀️" => self.handle_two_chars_token(TokenType::LessThan, "🟰", TokenType::LessThanOrEqual),
                 "🔁" => Token::from_str(TokenType::And, char),
                 "🔀" => Token::from_str(TokenType::Or, char),
                 "⏸️" => Token::from_str(TokenType::Not, char),
@@ -112,7 +112,7 @@ impl Lexer {
                 "✔️" => Token::from_str(TokenType::True, char),
                 "❌" => Token::from_str(TokenType::False, char),
                 "❓" => Token::from_str(TokenType::If, char),
-                "❗" => handle_two_chars_token(&chars, &mut pos),
+                "❗" => self.handle_two_chars_token(TokenType::Else, "🟰", TokenType::NotEqual),
                 "⭕" => Token::from_str(TokenType::While, char),
                 "📛" => Token::from_str(TokenType::Function, char),
                 "🔙" => Token::from_str(TokenType::Return, char),
@@ -123,76 +123,52 @@ impl Lexer {
                 "👈" => Token::from_str(TokenType::RBracket, char),
                 "🫸" => Token::from_str(TokenType::LBrace, char),
                 "🫷" => Token::from_str(TokenType::RBrace, char),
-                "🗨️" => handle_string(&chars, &mut pos),
-                _ if DIGITALS.contains(&char) => handle_number(&chars, &mut pos),
-                _ if SPACES.contains(&char) => {
-                    pos += 1;
-                    continue;
-                }
-                _ if is_identifier_char(char) => handle_identifier(&chars, &mut pos),
+                "🗨️" => self.handle_string(),
+                _ if DIGITALS.contains(char) => self.handle_number(),
+                _ if SPACES.contains(char) => continue,
+                _ if is_identifier_char(char) => self.handle_identifier(),
                 _ => Token::from_str(TokenType::Illegal, char),
             };
-            pos += 1;
             tokens.push(token);
         }
         tokens
     }
-}
 
-fn handle_two_chars_token(chars: &[&str], pos: &mut usize) -> Token {
-    let first_char = chars[*pos];
-    let mut literal = String::from(first_char);
-    if *pos < chars.len() - 1 {
-        literal.push_str(chars[*pos + 1]);
-    }
-    match &*literal {
-        "❗🟰" => {
-            *pos += 1;
-            Token::from(TokenType::NotEqual, literal)
+    fn handle_two_chars_token(&mut self, single_char_token_type: TokenType, expected_next_char: &str, two_chars_token_type:TokenType) -> Token {
+        let mut current_char = String::from(*self.chars.current().unwrap());
+        let mut token_type = single_char_token_type;
+        
+        if self.chars.is_next_eq(&expected_next_char) {
+            token_type = two_chars_token_type;
+            current_char.push_str(self.chars.next().unwrap());
         }
-        "▶️🟰" => {
-            *pos += 1;
-            Token::from(TokenType::GreaterThanOrEqual, literal)
+        
+        Token::from(token_type, current_char)
+    }
+
+    fn handle_string(&mut self) -> Token {
+        let mut literal = String::new();
+        while self.chars.next().is_some_and(|&char| char != "💬") {
+            literal.push_str(self.chars.current().unwrap());
         }
-        "◀️🟰" => {
-            *pos += 1;
-            Token::from(TokenType::LessThanOrEqual, literal)
+        Token::from(TokenType::String, literal)
+    }
+
+    fn handle_number(&mut self) -> Token {
+        let mut literal = String::from(*self.chars.current().unwrap());
+        while self.chars.is_next_match(|char| DIGITALS.contains(char) || DOTS.contains(char)) {
+            literal.push_str(self.chars.next().unwrap());
         }
-        _ if first_char == "❗" => Token::from_str(TokenType::Else, first_char),
-        _ if first_char == "▶️" => Token::from_str(TokenType::GreaterThan, first_char),
-        _ if first_char == "◀️" => Token::from_str(TokenType::LessThan, first_char),
-        _ => Token::from_str(TokenType::Illegal, first_char),
+        Token::from(TokenType::Number, literal)
     }
-}
 
-fn handle_string(chars: &[&str], pos: &mut usize) -> Token {
-    let mut literal = String::new();
-    while *pos < chars.len() - 1 && chars[*pos + 1] != "💬" {
-        *pos += 1;
-        literal.push_str(chars[*pos]);
+    fn handle_identifier(&mut self) -> Token {
+        let mut literal = String::from(*self.chars.current().unwrap());
+        while self.chars.is_next_match(|char| is_identifier_char(char)) {
+            literal.push_str(self.chars.next().unwrap());
+        }
+        Token::from(TokenType::Identifier, literal)
     }
-    *pos += 1;
-    Token::from(TokenType::String, literal)
-}
-
-fn handle_number(chars: &[&str], pos: &mut usize) -> Token {
-    let mut literal = String::from(chars[*pos]);
-    while *pos < chars.len() - 1
-        && (DIGITALS.contains(&chars[*pos + 1]) || DOTS.contains(&chars[*pos + 1]))
-    {
-        *pos += 1;
-        literal.push_str(chars[*pos]);
-    }
-    Token::from(TokenType::Number, literal)
-}
-
-fn handle_identifier(chars: &[&str], pos: &mut usize) -> Token {
-    let mut literal = String::from(chars[*pos]);
-    while *pos < chars.len() - 1 && is_identifier_char(chars[*pos + 1]) {
-        *pos += 1;
-        literal.push_str(chars[*pos]);
-    }
-    Token::from(TokenType::Identifier, literal)
 }
 
 fn is_identifier_char(char: &str) -> bool {
@@ -210,7 +186,7 @@ mod lexer_test {
     fn test() {
         let source = String::from(
             "
-        ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
+        ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
@@ -279,7 +255,7 @@ mod lexer_test {
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Identifier, "🅰️🅱️"),
         ];
-        let lexer = Lexer::new(source);
-        assert_eq!(lexer.tokenize(), target);
+        let mut lexer = Lexer::new(&source);
+        assert_eq!(lexer.tokenize().to_vec(), target);
     }
 }
