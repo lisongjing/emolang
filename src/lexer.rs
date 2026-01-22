@@ -46,7 +46,8 @@ pub enum TokenType {
     Function,
     Return,
 
-    Number,
+    Integer,
+    Float,
     String,
 }
 
@@ -158,10 +159,15 @@ impl <'a> Lexer<'a> {
 
     fn handle_number(&mut self) -> Token {
         let mut literal = String::from(*self.chars.current().unwrap());
+        let mut token_type = TokenType::Integer;
         while self.chars.is_next_match(|char| DIGITALS.contains(char) || DOTS.contains(char)) {
-            literal.push_str(self.chars.to_next().unwrap());
+            let next_char = self.chars.to_next().unwrap();
+            if DOTS.contains(next_char) {
+                token_type = TokenType::Float;
+            }
+            literal.push_str(next_char);
         }
-        Token::from(TokenType::Number, literal)
+        Token::from(token_type, literal)
     }
 
     fn handle_identifier(&mut self) -> Token {
@@ -205,9 +211,9 @@ mod lexer_test {
             Token::start(),
             Token::from_str(TokenType::Identifier, "㊙️🔢"),
             Token::from_str(TokenType::Assign, "⬅️"),
-            Token::from_str(TokenType::Number, "3️⃣⚪9️⃣"),
+            Token::from_str(TokenType::Float, "3️⃣⚪9️⃣"),
             Token::from_str(TokenType::Multiply, "✖️"),
-            Token::from_str(TokenType::Number, "2️⃣"),
+            Token::from_str(TokenType::Integer, "2️⃣"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::Identifier, "㊙️🔡"),
             Token::from_str(TokenType::Assign, "⬅️"),
@@ -224,11 +230,11 @@ mod lexer_test {
             Token::from_str(TokenType::While, "⭕"),
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::GreaterThanOrEqual, "▶️🟰"),
-            Token::from_str(TokenType::Number, "0️⃣"),
+            Token::from_str(TokenType::Integer, "0️⃣"),
             Token::from_str(TokenType::And, "🔁"),
             Token::from_str(TokenType::Identifier, "🅱️"),
             Token::from_str(TokenType::LessThanOrEqual, "◀️🟰"),
-            Token::from_str(TokenType::Number, "5️⃣"),
+            Token::from_str(TokenType::Integer, "5️⃣"),
             Token::from_str(TokenType::LBrace, "🫸"),
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::Assign, "⬅️"),
