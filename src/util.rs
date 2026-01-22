@@ -1,8 +1,13 @@
-use std::sync::mpsc::Iter;
-
+#[derive(Debug)]
 pub struct StatefulVector<T: PartialEq> {
     vector: Vec<T>,
     position: usize,
+}
+
+impl<T: PartialEq> Default for StatefulVector<T> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<T: PartialEq> StatefulVector<T> {
@@ -16,13 +21,6 @@ impl<T: PartialEq> StatefulVector<T> {
     pub fn from_vec(vector: Vec<T>) -> StatefulVector<T> {
         StatefulVector {
             vector,
-            position: 0,
-        }
-    }
-
-    pub fn from_iter(iterator: Iter<T>) -> StatefulVector<T> {
-        StatefulVector {
-            vector: iterator.collect::<Vec<T>>(),
             position: 0,
         }
     }
@@ -47,7 +45,7 @@ impl<T: PartialEq> StatefulVector<T> {
         }
     }
 
-    pub fn next(&mut self) -> Option<&T> {
+    pub fn to_next(&mut self) -> Option<&T> {
         if self.has_next() {
             self.position += 1;
             Some(&self.vector[self.position])
@@ -56,7 +54,7 @@ impl<T: PartialEq> StatefulVector<T> {
         }
     }
 
-    pub fn previous(&mut self) -> Option<&T> {
+    pub fn to_previous(&mut self) -> Option<&T> {
         if self.has_previous() {
             self.position -= 1;
             Some(&self.vector[self.position])
@@ -78,7 +76,7 @@ impl<T: PartialEq> StatefulVector<T> {
     }
 
     pub fn push(&mut self, element: T) {
-        self.vector.push(element);
+        self.vector.push(element)
     }
 
     pub fn pop(&mut self) -> Option<T> {
@@ -87,6 +85,14 @@ impl<T: PartialEq> StatefulVector<T> {
             self.position = self.vector.len() - 1
         };
         ele
+    }
+
+    pub fn insert(&mut self, index: usize, element: T) {
+        self.vector.insert(index, element)
+    }
+
+    pub fn remove(&mut self, index: usize) -> T {
+        self.vector.remove(index)
     }
 
     pub fn has_next(&self) -> bool {

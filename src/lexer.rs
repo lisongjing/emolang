@@ -5,7 +5,7 @@ use crate::util::StatefulVector;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum TokenType {
     Illegal,
-    End,
+    Start,
 
     Assign,
 
@@ -76,25 +76,27 @@ impl Token {
         Self::from(token_type, String::from(literal))
     }
 
-    pub fn end() -> Token {
-        Token::from(TokenType::End, String::new())
+    pub fn start() -> Token {
+        Token::from(TokenType::Start, String::new())
     }
 }
 
 pub struct Lexer<'a> {
-    input: &'a str,
     chars: StatefulVector<&'a str>,
 }
 
 impl <'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Lexer<'a> {
-        Lexer { input, chars: StatefulVector::from_vec(input.graphemes(true).collect::<Vec<&str>>()) }
+        Lexer { chars: StatefulVector::from_vec(input.graphemes(true).collect::<Vec<&str>>()) }
     }
 
     pub fn tokenize(&mut self) -> StatefulVector<Token> {
         let mut tokens = StatefulVector::<Token>::new();
+        let start_token = Token::start();
+        tokens.push(start_token);
+        self.chars.insert(0, " ");
 
-        while let Some(char) = self.chars.next() {
+        while let Some(char) = self.chars.to_next() {
             let token = match *char {
                 "⬅️" => Token::from_str(TokenType::Assign, char),
                 "➕" => Token::from_str(TokenType::Plus, char),
@@ -140,7 +142,7 @@ impl <'a> Lexer<'a> {
         
         if self.chars.is_next_eq(&expected_next_char) {
             token_type = two_chars_token_type;
-            current_char.push_str(self.chars.next().unwrap());
+            current_char.push_str(self.chars.to_next().unwrap());
         }
         
         Token::from(token_type, current_char)
@@ -148,7 +150,7 @@ impl <'a> Lexer<'a> {
 
     fn handle_string(&mut self) -> Token {
         let mut literal = String::new();
-        while self.chars.next().is_some_and(|&char| char != "💬") {
+        while self.chars.to_next().is_some_and(|&char| char != "💬") {
             literal.push_str(self.chars.current().unwrap());
         }
         Token::from(TokenType::String, literal)
@@ -157,7 +159,7 @@ impl <'a> Lexer<'a> {
     fn handle_number(&mut self) -> Token {
         let mut literal = String::from(*self.chars.current().unwrap());
         while self.chars.is_next_match(|char| DIGITALS.contains(char) || DOTS.contains(char)) {
-            literal.push_str(self.chars.next().unwrap());
+            literal.push_str(self.chars.to_next().unwrap());
         }
         Token::from(TokenType::Number, literal)
     }
@@ -165,7 +167,7 @@ impl <'a> Lexer<'a> {
     fn handle_identifier(&mut self) -> Token {
         let mut literal = String::from(*self.chars.current().unwrap());
         while self.chars.is_next_match(|char| is_identifier_char(char)) {
-            literal.push_str(self.chars.next().unwrap());
+            literal.push_str(self.chars.to_next().unwrap());
         }
         Token::from(TokenType::Identifier, literal)
     }
@@ -177,6 +179,7 @@ fn is_identifier_char(char: &str) -> bool {
         && !DOTS.contains(&char)
         && !SPACES.contains(&char)
 }
+
 
 #[cfg(test)]
 mod lexer_test {
@@ -199,6 +202,7 @@ mod lexer_test {
         ",
         );
         let target = vec![
+            Token::start(),
             Token::from_str(TokenType::Identifier, "㊙️🔢"),
             Token::from_str(TokenType::Assign, "⬅️"),
             Token::from_str(TokenType::Number, "3️⃣⚪9️⃣"),
