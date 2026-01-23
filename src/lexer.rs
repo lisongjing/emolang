@@ -161,14 +161,18 @@ impl <'a> Lexer<'a> {
 
     fn handle_number(&mut self) -> Token {
         let current_char = *self.chars.current().unwrap();
-        let mut literal = String::from(convert_emoji_digital(current_char));
+        let mut literal = String::from(convert_emoji_digital(current_char).unwrap());
         let mut token_type = TokenType::Integer;
         while self.chars.is_next_match(|char| DIGITALS.contains(char) || DOTS.contains(char)) {
             let next_char = self.chars.to_next().unwrap();
             if DOTS.contains(next_char) {
                 token_type = TokenType::Float;
             }
-            literal.push(convert_emoji_digital(next_char));
+            if let Some(char) = convert_emoji_digital(next_char) {
+                literal.push(char);
+            } else {
+                break;
+            }
         }
         Token::from(token_type, literal)
     }
@@ -189,13 +193,13 @@ fn is_identifier_char(char: &str) -> bool {
         && !SPACES.contains(&char)
 }
 
-fn convert_emoji_digital(emoji: &str) -> char {
+fn convert_emoji_digital(emoji: &str) -> Option<char> {
     if DIGITALS.contains(&emoji) {
-        emoji.chars().next().unwrap()
+        Some(emoji.chars().next().unwrap())
     } else if DOTS.contains(&emoji) {
-        '.'
+        Some('.')
     } else {
-        panic!("Expected a digital or dot, but got {emoji}")
+        None
     }
 }
 
