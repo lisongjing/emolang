@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}};
 
 use crate::{
     lexer::{Lexer, Token, TokenType},
@@ -15,7 +15,7 @@ pub enum Precedence {
     Call,        // fn🌜🌛
 }
 
-pub trait Node {
+pub trait Node: Debug {
     fn token_literal(&self) -> &str;
     fn string(&self) -> String;
 }
@@ -24,6 +24,7 @@ pub trait Statement: Node {}
 
 pub trait Expression: Node {}
 
+#[derive(Debug)]
 pub struct Program {
     statements: Vec<Box<dyn Statement>>,
 }
@@ -41,6 +42,7 @@ impl Node for Program {
     }
 }
 
+#[derive(Debug)]
 pub struct AssignStatement {
     token: Token,
     name: Identifier,
@@ -67,6 +69,7 @@ impl Node for AssignStatement {
 
 impl Statement for AssignStatement {}
 
+#[derive(Debug)]
 pub struct ReturnStatement {
     token: Token,
     value: Option<Box<dyn Expression>>,
@@ -91,6 +94,7 @@ impl Node for ReturnStatement {
 
 impl Statement for ReturnStatement {}
 
+#[derive(Debug)]
 pub struct ExpressionStatement {
     token: Token,
     expression: Box<dyn Expression>,
@@ -108,6 +112,7 @@ impl Node for ExpressionStatement {
 
 impl Statement for ExpressionStatement {}
 
+#[derive(Debug)]
 pub struct Identifier {
     token: Token,
     value: String,
@@ -125,8 +130,45 @@ impl Node for Identifier {
 
 impl Expression for Identifier {}
 
-type PrefixParser = Box<dyn Fn(&Parser) -> Box<dyn Expression>>;
-type InfixParser = Box<dyn Fn(&Parser, Box<dyn Expression>) -> Box<dyn Expression>>;
+#[derive(Debug)]
+pub struct IntegerLiteral {
+    token: Token,
+    value: i64,
+}
+
+impl Node for IntegerLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl Expression for IntegerLiteral {}
+
+#[derive(Debug)]
+pub struct FloatLiteral {
+    token: Token,
+    value: f64,
+}
+
+impl Node for FloatLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl Expression for FloatLiteral {}
+
+
+type PrefixParser = Box<dyn Fn(&Parser) -> Result<Box<dyn Expression>, String>>;
+type InfixParser = Box<dyn Fn(&Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
 
 pub struct Parser {
     tokens: StatefulVector<Token>,
@@ -146,9 +188,9 @@ impl Parser {
             infix_exp_parsers,
         };
 
-        parser
-            .prefix_exp_parsers
-            .insert(TokenType::Identifier, Box::new(|p| p.parse_identifier()));
+        parser.prefix_exp_parsers.insert(TokenType::Identifier, Box::new(|p| p.parse_identifier()));
+        parser.prefix_exp_parsers.insert(TokenType::Integer, Box::new(|p| p.parser_integer_literal()));
+        parser.prefix_exp_parsers.insert(TokenType::Float, Box::new(|p| p.parser_float_literal()));
 
         parser
     }
@@ -232,16 +274,34 @@ impl Parser {
 
         self.prefix_exp_parsers
             .get(&token.token_type)
-            .map(|f| f(self))
-            .ok_or_else(|| format!("Expected a expression, but got a {}", token.literal))
+            .ok_or_else(|| format!("Expected a expression, but got a {}", token.literal))?
+            (self)
     }
 
-    fn parse_identifier(&self) -> Box<dyn Expression> {
+    fn parse_identifier(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
-        Box::new(Identifier {
+        Ok(Box::new(Identifier {
             token: token.clone(),
             value: token.literal.clone(),
-        })
+        }))
+    }
+
+    fn parser_integer_literal(&self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let value = token.literal.parse().map_err(|err: ParseIntError| err.to_string())?;
+        Ok(Box::new(IntegerLiteral {
+            token: token.clone(),
+            value,
+        }))
+    }
+
+    fn parser_float_literal(&self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let value = token.literal.parse().map_err(|err: ParseFloatError| err.to_string())?;
+        Ok(Box::new(FloatLiteral {
+            token: token.clone(),
+            value,
+        }))
     }
 }
 
@@ -263,9 +323,11 @@ mod parser_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.statements.len(), 2);
+        assert_eq!(program.statements.len(), 3);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
-        assert_eq!(program.statements[1].token_literal(), "⬅️");
-        assert_eq!(parser.errors.len(), 3);
+        assert_eq!(program.statements[1].token_literal(), "3");
+        assert_eq!(program.statements[2].token_literal(), "⬅️");
+        assert_eq!(parser.errors.len(), 1);
+        assert!(parser.errors[0].contains("⬅️"));
     }
 }
