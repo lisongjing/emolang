@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}};
+use std::{cell::RefCell, collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}, rc::Rc};
 
 use crate::{
     lexer::{Lexer, Token, TokenType},
@@ -166,9 +166,28 @@ impl Node for FloatLiteral {
 
 impl Expression for FloatLiteral {}
 
+#[derive(Debug)]
+pub struct PrefixExpression {
+    token: Token,
+    operator: String,
+    right: Box<dyn Expression>,
+}
 
-type PrefixParser = Box<dyn Fn(&Parser) -> Result<Box<dyn Expression>, String>>;
-type InfixParser = Box<dyn Fn(&Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
+impl Node for PrefixExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!("({}{})", self.operator, self.right.string())
+    }
+}
+
+impl Expression for PrefixExpression {}
+
+
+type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
+type InfixParser = Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
 
 pub struct Parser {
     tokens: StatefulVector<Token>,
@@ -187,12 +206,17 @@ impl Parser {
             prefix_exp_parsers,
             infix_exp_parsers,
         };
-
-        parser.prefix_exp_parsers.insert(TokenType::Identifier, Box::new(|p| p.parse_identifier()));
-        parser.prefix_exp_parsers.insert(TokenType::Integer, Box::new(|p| p.parser_integer_literal()));
-        parser.prefix_exp_parsers.insert(TokenType::Float, Box::new(|p| p.parser_float_literal()));
-
+        parser.register_exp_parsers();
         parser
+    }
+
+    fn register_exp_parsers(&mut self) {
+        self.prefix_exp_parsers.insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
+        self.prefix_exp_parsers.insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
+        self.prefix_exp_parsers.insert(TokenType::Float, Rc::new(|p| p.parse_float_literal()));
+
+        self.prefix_exp_parsers.insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
+        self.prefix_exp_parsers.insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
     }
 
     pub fn parse_program(&mut self) -> Program {
@@ -269,12 +293,13 @@ impl Parser {
         }))
     }
 
-    fn parse_expression(&self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap();
 
         self.prefix_exp_parsers
             .get(&token.token_type)
             .ok_or_else(|| format!("Expected a expression, but got a {}", token.literal))?
+            .clone()
             (self)
     }
 
@@ -286,7 +311,7 @@ impl Parser {
         }))
     }
 
-    fn parser_integer_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_integer_literal(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token.literal.parse().map_err(|err: ParseIntError| err.to_string())?;
         Ok(Box::new(IntegerLiteral {
@@ -295,13 +320,26 @@ impl Parser {
         }))
     }
 
-    fn parser_float_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_float_literal(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token.literal.parse().map_err(|err: ParseFloatError| err.to_string())?;
         Ok(Box::new(FloatLiteral {
             token: token.clone(),
             value,
         }))
+    }
+
+    fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let operator = token.literal.clone();
+        if self.tokens.to_next().is_some() {
+            let right = self.parse_expression(Precedence::Prefix)?;
+            Ok(Box::new(PrefixExpression {
+                token, operator, right
+            }))
+        } else {
+            Err(format!("Expected a expression after operator {}", operator))
+        }
     }
 }
 
@@ -316,6 +354,8 @@ mod parser_test {
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         ⬅️ 3️⃣ ↙️
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
+        ➖6️⃣0️⃣ ↙️
+        ⏸️ 🈲
         ",
         );
 
@@ -323,10 +363,12 @@ mod parser_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.statements.len(), 3);
+        assert_eq!(program.statements.len(), 5);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
         assert_eq!(program.statements[1].token_literal(), "3");
         assert_eq!(program.statements[2].token_literal(), "⬅️");
+        assert_eq!(program.statements[3].token_literal(), "➖");
+        assert_eq!(program.statements[4].token_literal(), "⏸️");
         assert_eq!(parser.errors.len(), 1);
         assert!(parser.errors[0].contains("⬅️"));
     }
