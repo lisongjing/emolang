@@ -160,16 +160,20 @@ impl <'a> Lexer<'a> {
     }
 
     fn handle_number(&mut self) -> Token {
-        let current_char = *self.chars.current().unwrap();
-        let mut literal = String::from(convert_emoji_digital(current_char).unwrap());
+        let current_char = self.chars.current().unwrap().chars().next().unwrap();
+        let mut literal = String::from(current_char);
         let mut token_type = TokenType::Integer;
-        while self.chars.is_next_match(|char| DIGITALS.contains(char) || DOTS.contains(char)) {
-            let next_char = self.chars.to_next().unwrap();
-            if DOTS.contains(next_char) {
+        loop {
+            let is_digital = self.chars.is_next_match(|char| DIGITALS.contains(char));
+            let is_dot = self.chars.is_next_match(|char| DOTS.contains(char));
+
+            if is_digital {
+                let next_char = self.chars.to_next().unwrap();
+                literal.push(next_char.chars().next().unwrap());
+            } else if is_dot {
+                self.chars.to_next().unwrap();
                 token_type = TokenType::Float;
-            }
-            if let Some(char) = convert_emoji_digital(next_char) {
-                literal.push(char);
+                literal.push('.');
             } else {
                 break;
             }
@@ -191,16 +195,6 @@ fn is_identifier_char(char: &str) -> bool {
         && !DIGITALS.contains(&char)
         && !DOTS.contains(&char)
         && !SPACES.contains(&char)
-}
-
-fn convert_emoji_digital(emoji: &str) -> Option<char> {
-    if DIGITALS.contains(&emoji) {
-        Some(emoji.chars().next().unwrap())
-    } else if DOTS.contains(&emoji) {
-        Some('.')
-    } else {
-        None
-    }
 }
 
 
