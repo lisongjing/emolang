@@ -1,18 +1,44 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}, rc::Rc};
+use std::{collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}, rc::Rc, sync::OnceLock};
 
 use crate::{
     lexer::{Lexer, Token, TokenType},
     util::StatefulVector,
 };
 
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
     Lowest,
     Equals,      // 🟰/❗🟰
     LessGreater, // ▶️/▶️🟰/◀️/◀️🟰
-    Plus,        // ➕/➖
+    Sum,        // ➕/➖
     Product,     // ✖️/➗/〰️
     Prefix,      // ➖x/⏸️x
     Call,        // fn🌜🌛
+}
+
+static OPERATOR_PRECEDENCES: OnceLock<HashMap<TokenType, Precedence>> = OnceLock::new();
+
+fn get_operator_precedence(token: &Token) -> &Precedence {
+    let map = OPERATOR_PRECEDENCES.get_or_init(|| {
+        let mut map = HashMap::new();
+        map.insert(TokenType::Equal, Precedence::Equals);
+        map.insert(TokenType::NotEqual, Precedence::Equals);
+
+        map.insert(TokenType::LessThan, Precedence::LessGreater);
+        map.insert(TokenType::LessThanOrEqual, Precedence::LessGreater);
+        map.insert(TokenType::GreaterThan, Precedence::LessGreater);
+        map.insert(TokenType::GreaterThanOrEqual, Precedence::LessGreater);
+
+        map.insert(TokenType::Plus, Precedence::Sum);
+        map.insert(TokenType::Minus, Precedence::Sum);
+
+        map.insert(TokenType::Multiply, Precedence::Product);
+        map.insert(TokenType::Divide, Precedence::Product);
+        map.insert(TokenType::Modulo, Precedence::Product);
+
+        map
+    });
+    map.get(&token.token_type).unwrap_or(&Precedence::Lowest)
 }
 
 pub trait Node: Debug {
@@ -185,6 +211,26 @@ impl Node for PrefixExpression {
 
 impl Expression for PrefixExpression {}
 
+#[derive(Debug)]
+pub struct InfixExpression {
+    token: Token,
+    left: Box<dyn Expression>,
+    operator: String,
+    right: Box<dyn Expression>,
+}
+
+impl Node for InfixExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!("({} {} {})", self.left.string(), self.operator, self.right.string())
+    }
+}
+
+impl Expression for InfixExpression {}
+
 
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
 type InfixParser = Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
@@ -217,6 +263,18 @@ impl Parser {
 
         self.prefix_exp_parsers.insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
         self.prefix_exp_parsers.insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
+        
+        self.infix_exp_parsers.insert(TokenType::Equal, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::NotEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::LessThan, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::LessThanOrEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::GreaterThan, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::GreaterThanOrEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::Plus, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::Minus, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::Multiply, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::Divide, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.infix_exp_parsers.insert(TokenType::Modulo, Rc::new(|p, left| p.parse_infix_expression(left)));
     }
 
     pub fn parse_program(&mut self) -> Program {
@@ -296,11 +354,21 @@ impl Parser {
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap();
 
-        self.prefix_exp_parsers
+        let mut left = self.prefix_exp_parsers
             .get(&token.token_type)
             .ok_or_else(|| format!("Expected a expression, but got a {}", token.literal))?
             .clone()
-            (self)
+            (self)?;
+        
+        while self.tokens.is_next_match(|next_token| next_token.token_type != TokenType::Semicolon && precedence < *get_operator_precedence(next_token)) {
+            if let Some(infix) = self.tokens.to_next().and_then(|token| self.infix_exp_parsers.get(&token.token_type)) {
+                left = infix.clone()(self, left)?;
+            } else {
+                self.tokens.to_previous();
+            }
+        }
+
+        Ok(left)
     }
 
     fn parse_identifier(&self) -> Result<Box<dyn Expression>, String> {
@@ -341,6 +409,20 @@ impl Parser {
             Err(format!("Expected a expression after operator {}", operator))
         }
     }
+
+    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let operator = token.literal.clone();
+        let precedence = *get_operator_precedence(self.tokens.current().unwrap());
+        self.tokens.to_next();
+        let right = self.parse_expression(precedence)?;
+        Ok(Box::new(InfixExpression {
+            token,
+            left,
+            operator,
+            right,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -354,8 +436,7 @@ mod parser_test {
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         ⬅️ 3️⃣ ↙️
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
-        ➖6️⃣0️⃣ ↙️
-        ⏸️ 🈲
+        ⏸️ ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
         ",
         );
 
@@ -363,12 +444,15 @@ mod parser_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.statements.len(), 5);
+        assert_eq!(program.statements.len(), 4);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
+        // assert_eq!(program.statements[0].string(), "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
         assert_eq!(program.statements[1].token_literal(), "3");
+        assert_eq!(program.statements[1].string(), "3");
         assert_eq!(program.statements[2].token_literal(), "⬅️");
-        assert_eq!(program.statements[3].token_literal(), "➖");
-        assert_eq!(program.statements[4].token_literal(), "⏸️");
+        // assert_eq!(program.statements[2].string(), "㊙️🔢 ⬅️ (3️⃣⚪9️⃣ ✖️ 2️⃣) ↙️");
+        assert_eq!(program.statements[3].token_literal(), "⏸️");
+        assert_eq!(program.statements[3].string(), "((⏸️(➖8)) ▶️🟰 ((➖3.9) ✖️ 2))");
         assert_eq!(parser.errors.len(), 1);
         assert!(parser.errors[0].contains("⬅️"));
     }

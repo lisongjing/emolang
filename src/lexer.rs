@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 use unicode_segmentation::UnicodeSegmentation;
 
 use crate::util::StatefulVector;
