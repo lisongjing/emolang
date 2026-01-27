@@ -1,4 +1,10 @@
-use std::{collections::HashMap, fmt::Debug, num::{ParseFloatError, ParseIntError}, rc::Rc, sync::OnceLock};
+use std::{
+    collections::HashMap,
+    fmt::Debug,
+    num::{ParseFloatError, ParseIntError},
+    rc::Rc,
+    sync::OnceLock,
+};
 
 use crate::{
     lexer::{Lexer, Token, TokenType},
@@ -10,7 +16,7 @@ pub enum Precedence {
     Lowest,
     Equals,      // 🟰/❗🟰
     LessGreater, // ▶️/▶️🟰/◀️/◀️🟰
-    Sum,        // ➕/➖
+    Sum,         // ➕/➖
     Product,     // ✖️/➗/〰️
     Prefix,      // ➖x/⏸️x
     Call,        // fn🌜🌛
@@ -243,15 +249,20 @@ impl Node for InfixExpression {
     }
 
     fn string(&self) -> String {
-        format!("({} {} {})", self.left.string(), self.operator, self.right.string())
+        format!(
+            "({} {} {})",
+            self.left.string(),
+            self.operator,
+            self.right.string()
+        )
     }
 }
 
 impl Expression for InfixExpression {}
 
-
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
-type InfixParser = Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
+type InfixParser =
+    Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
 
 pub struct Parser {
     tokens: StatefulVector<Token>,
@@ -275,26 +286,71 @@ impl Parser {
     }
 
     fn register_exp_parsers(&mut self) {
-        self.prefix_exp_parsers.insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
-        self.prefix_exp_parsers.insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
-        self.prefix_exp_parsers.insert(TokenType::Float, Rc::new(|p| p.parse_float_literal()));
-        self.prefix_exp_parsers.insert(TokenType::True, Rc::new(|p| p.parse_bool_literal()));
-        self.prefix_exp_parsers.insert(TokenType::False, Rc::new(|p| p.parse_bool_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
+        self.prefix_exp_parsers
+            .insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::Float, Rc::new(|p| p.parse_float_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::True, Rc::new(|p| p.parse_bool_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::False, Rc::new(|p| p.parse_bool_literal()));
 
-        self.prefix_exp_parsers.insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
-        self.prefix_exp_parsers.insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
-        
-        self.infix_exp_parsers.insert(TokenType::Equal, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::NotEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::LessThan, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::LessThanOrEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::GreaterThan, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::GreaterThanOrEqual, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::Plus, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::Minus, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::Multiply, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::Divide, Rc::new(|p, left| p.parse_infix_expression(left)));
-        self.infix_exp_parsers.insert(TokenType::Modulo, Rc::new(|p, left| p.parse_infix_expression(left)));
+        self.prefix_exp_parsers
+            .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
+        self.prefix_exp_parsers
+            .insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
+
+        self.prefix_exp_parsers.insert(
+            TokenType::LParenthesis,
+            Rc::new(|p| p.parse_group_expression()),
+        );
+
+        self.infix_exp_parsers.insert(
+            TokenType::Equal,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::NotEqual,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::LessThan,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::LessThanOrEqual,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::GreaterThan,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::GreaterThanOrEqual,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::Plus,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::Minus,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::Multiply,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::Divide,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::Modulo,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
     }
 
     pub fn parse_program(&mut self) -> Program {
@@ -374,14 +430,21 @@ impl Parser {
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap();
 
-        let mut left = self.prefix_exp_parsers
+        let mut left = self
+            .prefix_exp_parsers
             .get(&token.token_type)
             .ok_or_else(|| format!("Expected a expression, but got a {}", token.literal))?
-            .clone()
-            (self)?;
-        
-        while self.tokens.is_next_match(|next_token| next_token.token_type != TokenType::Semicolon && precedence < *get_operator_precedence(next_token)) {
-            if let Some(infix) = self.tokens.to_next().and_then(|token| self.infix_exp_parsers.get(&token.token_type)) {
+            .clone()(self)?;
+
+        while self.tokens.is_next_match(|next_token| {
+            next_token.token_type != TokenType::Semicolon
+                && precedence < *get_operator_precedence(next_token)
+        }) {
+            if let Some(infix) = self
+                .tokens
+                .to_next()
+                .and_then(|token| self.infix_exp_parsers.get(&token.token_type))
+            {
                 left = infix.clone()(self, left)?;
             } else {
                 self.tokens.to_previous();
@@ -401,29 +464,26 @@ impl Parser {
 
     fn parse_integer_literal(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
-        let value = token.literal.parse().map_err(|err: ParseIntError| err.to_string())?;
-        Ok(Box::new(IntegerLiteral {
-            token,
-            value,
-        }))
+        let value = token
+            .literal
+            .parse()
+            .map_err(|err: ParseIntError| err.to_string())?;
+        Ok(Box::new(IntegerLiteral { token, value }))
     }
 
     fn parse_float_literal(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
-        let value = token.literal.parse().map_err(|err: ParseFloatError| err.to_string())?;
-        Ok(Box::new(FloatLiteral {
-            token,
-            value,
-        }))
+        let value = token
+            .literal
+            .parse()
+            .map_err(|err: ParseFloatError| err.to_string())?;
+        Ok(Box::new(FloatLiteral { token, value }))
     }
 
     fn parse_bool_literal(&self) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token.token_type == TokenType::True;
-        Ok(Box::new(BooleanLiteral {
-            token,
-            value,
-        }))
+        Ok(Box::new(BooleanLiteral { token, value }))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, String> {
@@ -432,14 +492,19 @@ impl Parser {
         if self.tokens.to_next().is_some() {
             let right = self.parse_expression(Precedence::Prefix)?;
             Ok(Box::new(PrefixExpression {
-                token, operator, right
+                token,
+                operator,
+                right,
             }))
         } else {
             Err(format!("Expected a expression after operator {}", operator))
         }
     }
 
-    fn parse_infix_expression(&mut self, left: Box<dyn Expression>) -> Result<Box<dyn Expression>, String> {
+    fn parse_infix_expression(
+        &mut self,
+        left: Box<dyn Expression>,
+    ) -> Result<Box<dyn Expression>, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
         let precedence = *get_operator_precedence(self.tokens.current().unwrap());
@@ -451,6 +516,21 @@ impl Parser {
             operator,
             right,
         }))
+    }
+
+    fn parse_group_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        self.tokens.to_next();
+        let exp = self.parse_expression(Precedence::Lowest)?;
+
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::RParenthesis)
+        {
+            Err(String::from("Expected a right parenthesis"))
+        } else {
+            self.tokens.to_next();
+            Ok(exp)
+        }
     }
 }
 
@@ -466,7 +546,7 @@ mod parser_test {
         ⬅️ 3️⃣ ↙️
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
         ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
-        ⏸️❌↙️
+        ⏸️🌜❌🟰0️⃣◀️1️⃣🌛↙️
         ",
         );
 
@@ -484,7 +564,7 @@ mod parser_test {
         assert_eq!(program.statements[3].token_literal(), "➖");
         assert_eq!(program.statements[3].string(), "((➖8) ▶️🟰 ((➖3.9) ✖️ 2))");
         assert_eq!(program.statements[4].token_literal(), "⏸️");
-        assert_eq!(program.statements[4].string(), "(⏸️false)");
+        assert_eq!(program.statements[4].string(), "(⏸️(false 🟰 (0 ◀️ 1)))");
         assert_eq!(parser.errors.len(), 1);
         assert!(parser.errors[0].contains("⬅️"));
     }
