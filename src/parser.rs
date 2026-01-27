@@ -193,6 +193,24 @@ impl Node for FloatLiteral {
 impl Expression for FloatLiteral {}
 
 #[derive(Debug)]
+pub struct BooleanLiteral {
+    token: Token,
+    value: bool,
+}
+
+impl Node for BooleanLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        self.value.to_string()
+    }
+}
+
+impl Expression for BooleanLiteral {}
+
+#[derive(Debug)]
 pub struct PrefixExpression {
     token: Token,
     operator: String,
@@ -260,6 +278,8 @@ impl Parser {
         self.prefix_exp_parsers.insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
         self.prefix_exp_parsers.insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
         self.prefix_exp_parsers.insert(TokenType::Float, Rc::new(|p| p.parse_float_literal()));
+        self.prefix_exp_parsers.insert(TokenType::True, Rc::new(|p| p.parse_bool_literal()));
+        self.prefix_exp_parsers.insert(TokenType::False, Rc::new(|p| p.parse_bool_literal()));
 
         self.prefix_exp_parsers.insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
         self.prefix_exp_parsers.insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
@@ -383,7 +403,7 @@ impl Parser {
         let token = self.tokens.current().unwrap().clone();
         let value = token.literal.parse().map_err(|err: ParseIntError| err.to_string())?;
         Ok(Box::new(IntegerLiteral {
-            token: token.clone(),
+            token,
             value,
         }))
     }
@@ -392,7 +412,16 @@ impl Parser {
         let token = self.tokens.current().unwrap().clone();
         let value = token.literal.parse().map_err(|err: ParseFloatError| err.to_string())?;
         Ok(Box::new(FloatLiteral {
-            token: token.clone(),
+            token,
+            value,
+        }))
+    }
+
+    fn parse_bool_literal(&self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let value = token.token_type == TokenType::True;
+        Ok(Box::new(BooleanLiteral {
+            token,
             value,
         }))
     }
@@ -436,7 +465,8 @@ mod parser_test {
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         ⬅️ 3️⃣ ↙️
         ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
-        ⏸️ ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
+        ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
+        ⏸️❌↙️
         ",
         );
 
@@ -444,15 +474,17 @@ mod parser_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.statements.len(), 4);
+        assert_eq!(program.statements.len(), 5);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
         // assert_eq!(program.statements[0].string(), "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
         assert_eq!(program.statements[1].token_literal(), "3");
         assert_eq!(program.statements[1].string(), "3");
         assert_eq!(program.statements[2].token_literal(), "⬅️");
         // assert_eq!(program.statements[2].string(), "㊙️🔢 ⬅️ (3️⃣⚪9️⃣ ✖️ 2️⃣) ↙️");
-        assert_eq!(program.statements[3].token_literal(), "⏸️");
-        assert_eq!(program.statements[3].string(), "((⏸️(➖8)) ▶️🟰 ((➖3.9) ✖️ 2))");
+        assert_eq!(program.statements[3].token_literal(), "➖");
+        assert_eq!(program.statements[3].string(), "((➖8) ▶️🟰 ((➖3.9) ✖️ 2))");
+        assert_eq!(program.statements[4].token_literal(), "⏸️");
+        assert_eq!(program.statements[4].string(), "(⏸️false)");
         assert_eq!(parser.errors.len(), 1);
         assert!(parser.errors[0].contains("⬅️"));
     }
