@@ -128,7 +128,7 @@ impl Node for ExpressionStatement {
     }
 
     fn string(&self) -> String {
-        self.expression.string()
+        format!("{} ↙️", self.expression.string())
     }
 }
 
@@ -164,7 +164,11 @@ impl Node for IntegerLiteral {
     }
 
     fn string(&self) -> String {
-        self.value.to_string()
+        self.value
+            .to_string()
+            .chars()
+            .map(|digital| format!("{digital}\u{fe0f}\u{20e3}"))
+            .collect()
     }
 }
 
@@ -182,7 +186,17 @@ impl Node for FloatLiteral {
     }
 
     fn string(&self) -> String {
-        self.value.to_string()
+        self.value
+            .to_string()
+            .chars()
+            .map(|char| {
+                if char == '.' {
+                    "\u{26aa}".to_string()
+                } else {
+                    format!("{char}\u{fe0f}\u{20e3}")
+                }
+            })
+            .collect()
     }
 }
 
@@ -200,7 +214,7 @@ impl Node for BooleanLiteral {
     }
 
     fn string(&self) -> String {
-        self.value.to_string()
+        String::from(if self.value { "✔️" } else { "❌" })
     }
 }
 
@@ -237,7 +251,7 @@ impl Node for PrefixExpression {
     }
 
     fn string(&self) -> String {
-        format!("({}{})", self.operator, self.right.string())
+        format!("🌜{}{}🌛", self.operator, self.right.string())
     }
 }
 
@@ -258,7 +272,7 @@ impl Node for InfixExpression {
 
     fn string(&self) -> String {
         format!(
-            "({} {} {})",
+            "🌜{} {} {}🌛",
             self.left.string(),
             self.operator,
             self.right.string()
@@ -582,18 +596,27 @@ mod parser_test {
 
         assert_eq!(program.statements.len(), 5);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
-        assert_eq!(program.statements[0].string(), "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
+        assert_eq!(
+            program.statements[0].string(),
+            "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️"
+        );
         assert_eq!(program.statements[1].token_literal(), "3");
-        assert_eq!(program.statements[1].string(), "3");
+        assert_eq!(program.statements[1].string(), "3️⃣ ↙️");
         assert_eq!(program.statements[2].token_literal(), "⬅️");
-        // assert_eq!(program.statements[2].string(), "㊙️🔢 ⬅️ (3️⃣⚪9️⃣ ✖️ 2️⃣) ↙️");
+        assert_eq!(
+            program.statements[2].string(),
+            "㊙️🔢 ⬅️ 🌜3️⃣⚪9️⃣ ✖️ 2️⃣🌛 ↙️"
+        );
         assert_eq!(program.statements[3].token_literal(), "➖");
         assert_eq!(
             program.statements[3].string(),
-            "((➖8) ▶️🟰 ((➖3.9) ✖️ 2))"
+            "🌜🌜➖8️⃣🌛 ▶️🟰 🌜🌜➖3️⃣⚪9️⃣🌛 ✖️ 2️⃣🌛🌛 ↙️"
         );
         assert_eq!(program.statements[4].token_literal(), "⏸️");
-        assert_eq!(program.statements[4].string(), "(⏸️(false 🟰 (0 ◀️ 1)))");
+        assert_eq!(
+            program.statements[4].string(),
+            "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️"
+        );
         assert_eq!(parser.errors.len(), 1);
         assert!(parser.errors[0].contains("⬅️"));
     }
