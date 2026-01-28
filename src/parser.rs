@@ -78,7 +78,7 @@ impl Node for Program {
 pub struct AssignStatement {
     token: Token,
     name: Identifier,
-    value: Option<Box<dyn Expression>>,
+    value: Box<dyn Expression>,
 }
 
 impl Node for AssignStatement {
@@ -91,10 +91,7 @@ impl Node for AssignStatement {
             "{} {} {} ↙️",
             self.name.string(),
             self.token.literal,
-            self.value
-                .as_ref()
-                .map(|exp| exp.string())
-                .unwrap_or_default()
+            self.value.string(),
         )
     }
 }
@@ -104,7 +101,7 @@ impl Statement for AssignStatement {}
 #[derive(Debug)]
 pub struct ReturnStatement {
     token: Token,
-    value: Option<Box<dyn Expression>>,
+    value: Box<dyn Expression>,
 }
 
 impl Node for ReturnStatement {
@@ -113,14 +110,7 @@ impl Node for ReturnStatement {
     }
 
     fn string(&self) -> String {
-        format!(
-            "{} {} ↙️",
-            self.token.literal,
-            self.value
-                .as_ref()
-                .map(|exp| exp.string())
-                .unwrap_or_default()
-        )
+        format!("{} {} ↙️", self.token.literal, self.value.string(),)
     }
 }
 
@@ -217,6 +207,24 @@ impl Node for BooleanLiteral {
 impl Expression for BooleanLiteral {}
 
 #[derive(Debug)]
+pub struct StringLiteral {
+    token: Token,
+    value: String,
+}
+
+impl Node for StringLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!("🗨️{}💬", self.value)
+    }
+}
+
+impl Expression for StringLiteral {}
+
+#[derive(Debug)]
 pub struct PrefixExpression {
     token: Token,
     operator: String,
@@ -296,6 +304,8 @@ impl Parser {
             .insert(TokenType::True, Rc::new(|p| p.parse_bool_literal()));
         self.prefix_exp_parsers
             .insert(TokenType::False, Rc::new(|p| p.parse_bool_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::String, Rc::new(|p| p.parse_string_literal()));
 
         self.prefix_exp_parsers
             .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
@@ -385,28 +395,38 @@ impl Parser {
             value: identifier.literal,
         };
         let assign_token = self.tokens.to_next().unwrap().clone();
-        while let Some(token) = self.tokens.to_next()
-            && token.token_type != TokenType::Semicolon
+
+        self.tokens.to_next();
+        let value = self.parse_expression(Precedence::Lowest)?;
+        while self
+            .tokens
+            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
         {
-            &token.literal;
+            self.tokens.to_next();
         }
+
         Ok(Box::new(AssignStatement {
             token: assign_token,
             name: identifier,
-            value: None,
+            value,
         }))
     }
 
     fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, String> {
         let return_token = self.tokens.current().unwrap().clone();
-        while let Some(token) = self.tokens.to_next()
-            && token.token_type != TokenType::Semicolon
+
+        self.tokens.to_next();
+        let value = self.parse_expression(Precedence::Lowest)?;
+        while self
+            .tokens
+            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
         {
-            &token.literal;
+            self.tokens.to_next();
         }
+
         Ok(Box::new(ReturnStatement {
             token: return_token,
-            value: None,
+            value,
         }))
     }
 
@@ -414,7 +434,7 @@ impl Parser {
         let exp_token = self.tokens.current().unwrap().clone();
         let exp = self.parse_expression(Precedence::Lowest)?;
 
-        if self
+        while self
             .tokens
             .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
         {
@@ -484,6 +504,12 @@ impl Parser {
         let token = self.tokens.current().unwrap().clone();
         let value = token.token_type == TokenType::True;
         Ok(Box::new(BooleanLiteral { token, value }))
+    }
+
+    fn parse_string_literal(&self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let value = token.literal.clone();
+        Ok(Box::new(StringLiteral { token, value }))
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, String> {
@@ -556,13 +582,16 @@ mod parser_test {
 
         assert_eq!(program.statements.len(), 5);
         assert_eq!(program.statements[0].token_literal(), "⬅️");
-        // assert_eq!(program.statements[0].string(), "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
+        assert_eq!(program.statements[0].string(), "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️");
         assert_eq!(program.statements[1].token_literal(), "3");
         assert_eq!(program.statements[1].string(), "3");
         assert_eq!(program.statements[2].token_literal(), "⬅️");
         // assert_eq!(program.statements[2].string(), "㊙️🔢 ⬅️ (3️⃣⚪9️⃣ ✖️ 2️⃣) ↙️");
         assert_eq!(program.statements[3].token_literal(), "➖");
-        assert_eq!(program.statements[3].string(), "((➖8) ▶️🟰 ((➖3.9) ✖️ 2))");
+        assert_eq!(
+            program.statements[3].string(),
+            "((➖8) ▶️🟰 ((➖3.9) ✖️ 2))"
+        );
         assert_eq!(program.statements[4].token_literal(), "⏸️");
         assert_eq!(program.statements[4].string(), "(⏸️(false 🟰 (0 ◀️ 1)))");
         assert_eq!(parser.errors.len(), 1);
