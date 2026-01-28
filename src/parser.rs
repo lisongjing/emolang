@@ -135,6 +135,29 @@ impl Node for ExpressionStatement {
 impl Statement for ExpressionStatement {}
 
 #[derive(Debug)]
+pub struct BlockStatement {
+    token: Token,
+    statements: Vec<Box<dyn Statement>>,
+}
+
+impl Node for BlockStatement {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        let mut string = String::from("🫸");
+        self.statements
+            .iter()
+            .for_each(|stmt| string.push_str(&stmt.string()));
+        string.push('🫷');
+        string
+    }
+}
+
+impl Statement for BlockStatement {}
+
+#[derive(Debug)]
 pub struct Identifier {
     token: Token,
     value: String,
@@ -282,6 +305,35 @@ impl Node for InfixExpression {
 
 impl Expression for InfixExpression {}
 
+#[derive(Debug)]
+pub struct IfExpression {
+    token: Token,
+    condition: Box<dyn Expression>,
+    consequence: Box<dyn Statement>,
+    alternative: Option<Box<dyn Statement>>,
+}
+
+impl Node for IfExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        let mut string = format!(
+            "❓ {} {}",
+            self.condition.string(),
+            self.consequence.string()
+        );
+        if let Some(stmt) = &self.alternative {
+            string.push_str(" ❗ ");
+            string.push_str(&stmt.string());
+        }
+        string
+    }
+}
+
+impl Expression for IfExpression {}
+
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
 type InfixParser =
     Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
@@ -325,6 +377,9 @@ impl Parser {
             .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
         self.prefix_exp_parsers
             .insert(TokenType::Minus, Rc::new(|p| p.parse_prefix_expression()));
+
+        self.prefix_exp_parsers
+            .insert(TokenType::If, Rc::new(|p| p.parse_if_expression()));
 
         self.prefix_exp_parsers.insert(
             TokenType::LParenthesis,
@@ -380,12 +435,8 @@ impl Parser {
     pub fn parse_program(&mut self) -> Program {
         let mut program = Program { statements: vec![] };
 
-        while let Some(token) = self.tokens.to_next() {
-            let statement = match token.token_type {
-                TokenType::Identifier => self.parse_assign_statement(),
-                TokenType::Return => self.parse_return_statement(),
-                _ => self.parse_expression_statement(),
-            };
+        while self.tokens.to_next().is_some() {
+            let statement = self.parse_statement();
             match statement {
                 Ok(statement) => program.statements.push(statement),
                 Err(error_msg) => self.errors.push(error_msg),
@@ -393,6 +444,15 @@ impl Parser {
         }
 
         program
+    }
+
+    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+        match self.tokens.current().unwrap().token_type {
+            TokenType::Identifier => self.parse_assign_statement(),
+            TokenType::Return => self.parse_return_statement(),
+            TokenType::LBrace => self.parse_block_statement(),
+            _ => self.parse_expression_statement(),
+        }
     }
 
     fn parse_assign_statement(&mut self) -> Result<Box<dyn Statement>, String> {
@@ -459,6 +519,25 @@ impl Parser {
             token: exp_token,
             expression: exp,
         }))
+    }
+
+    fn parse_block_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let mut statements = vec![];
+
+        self.tokens.to_next();
+
+        while self
+            .tokens
+            .current()
+            .is_some_and(|token| token.token_type != TokenType::RBrace)
+        {
+            let stmt = self.parse_statement()?;
+            statements.push(stmt);
+            self.tokens.to_next();
+        }
+
+        Ok(Box::new(BlockStatement { token, statements }))
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
@@ -572,6 +651,50 @@ impl Parser {
             Ok(exp)
         }
     }
+
+    fn parse_if_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+
+        self.tokens.to_next();
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::LBrace)
+        {
+            return Err(String::from(
+                "Expected a block statement after if-condition",
+            ));
+        }
+
+        self.tokens.to_next();
+        let consequence = self.parse_block_statement()?;
+
+        let alternative = if self
+            .tokens
+            .is_next_match(|token| token.token_type == TokenType::Else)
+        {
+            self.tokens.to_next();
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type != TokenType::LBrace)
+            {
+                return Err(String::from("Expected a block statement after else"));
+            }
+            self.tokens.to_next();
+            Some(self.parse_block_statement()?)
+        } else {
+            None
+        };
+
+        Ok(Box::new(IfExpression {
+            token,
+            condition,
+            consequence,
+            alternative,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -581,13 +704,13 @@ mod parser_test {
     #[test]
     fn test() {
         let source = String::from(
-            "
-        ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
-        ⬅️ 3️⃣ ↙️
-        ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️ 
-        ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
-        ⏸️🌜❌🟰0️⃣◀️1️⃣🌛↙️
-        ",
+                "
+            ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
+            ⬅️ 3️⃣ ↙️
+            ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
+            ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
+            ⏸️🌜❌🟰0️⃣◀️1️⃣🌛↙️
+            ",
         );
 
         let mut lexer = Lexer::new(&source);
@@ -602,10 +725,10 @@ mod parser_test {
         );
         assert_eq!(program.statements[1].token_literal(), "3");
         assert_eq!(program.statements[1].string(), "3️⃣ ↙️");
-        assert_eq!(program.statements[2].token_literal(), "⬅️");
+        assert_eq!(program.statements[2].token_literal(), "❓");
         assert_eq!(
             program.statements[2].string(),
-            "㊙️🔢 ⬅️ 🌜3️⃣⚪9️⃣ ✖️ 2️⃣🌛 ↙️"
+            "❓ 🌜🅰️ ▶️ 🅱️🌛 🫸🅰️ ↙️🫷 ❗ 🫸🅱️ ↙️🫷 ↙️"
         );
         assert_eq!(program.statements[3].token_literal(), "➖");
         assert_eq!(
