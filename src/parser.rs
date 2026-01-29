@@ -146,7 +146,7 @@ impl Node for BlockStatement {
     }
 
     fn string(&self) -> String {
-        let mut string = String::from("🫸");
+        let mut string = String::from(self.token_literal());
         self.statements
             .iter()
             .for_each(|stmt| string.push_str(&stmt.string()));
@@ -237,7 +237,7 @@ impl Node for BooleanLiteral {
     }
 
     fn string(&self) -> String {
-        String::from(if self.value { "✔️" } else { "❌" })
+        String::from(self.token_literal())
     }
 }
 
@@ -309,8 +309,8 @@ impl Expression for InfixExpression {}
 pub struct IfExpression {
     token: Token,
     condition: Box<dyn Expression>,
-    consequence: Box<dyn Statement>,
-    alternative: Option<Box<dyn Statement>>,
+    consequence: Box<BlockStatement>,
+    alternative: Option<Box<BlockStatement>>,
 }
 
 impl Node for IfExpression {
@@ -320,7 +320,8 @@ impl Node for IfExpression {
 
     fn string(&self) -> String {
         let mut string = format!(
-            "❓ {} {}",
+            "{} {} {}",
+            self.token_literal(),
             self.condition.string(),
             self.consequence.string()
         );
@@ -450,7 +451,7 @@ impl Parser {
         match self.tokens.current().unwrap().token_type {
             TokenType::Identifier => self.parse_assign_statement(),
             TokenType::Return => self.parse_return_statement(),
-            TokenType::LBrace => self.parse_block_statement(),
+            TokenType::LBrace => self.parse_block_statement().map(|stmt| stmt as Box<dyn Statement>),
             _ => self.parse_expression_statement(),
         }
     }
@@ -521,7 +522,7 @@ impl Parser {
         }))
     }
 
-    fn parse_block_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+    fn parse_block_statement(&mut self) -> Result<Box<BlockStatement>, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut statements = vec![];
 
