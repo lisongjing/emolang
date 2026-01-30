@@ -14,6 +14,8 @@ use crate::{
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
     Lowest,
+    Or,          // 🔀
+    And,         // 🔁
     Equals,      // 🟰/❗🟰
     LessGreater, // ▶️/▶️🟰/◀️/◀️🟰
     Sum,         // ➕/➖
@@ -146,12 +148,7 @@ impl Node for BlockStatement {
     }
 
     fn string(&self) -> String {
-        let mut string = String::from(self.token_literal());
-        self.statements
-            .iter()
-            .for_each(|stmt| string.push_str(&stmt.string()));
-        string.push('🫷');
-        string
+        format!("{} {} 🫷", self.token_literal(), self.statements.iter().map(|stmt| stmt.string()).collect::<String>())
     }
 }
 
@@ -335,6 +332,32 @@ impl Node for IfExpression {
 
 impl Expression for IfExpression {}
 
+#[derive(Debug)]
+pub struct FunctionLiteral {
+    token: Token,
+    name: Option<Box<Identifier>>,
+    parameters: Vec<Box<Identifier>>,
+    body: Box<BlockStatement>,
+}
+
+impl Node for FunctionLiteral {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!(
+            "{} {}🌜{}🌛 {}",
+            self.token_literal(),
+            self.name.as_ref().map_or(String::new(), |ident| ident.string() + " "),
+            self.parameters.iter().map(|ident| ident.string()).collect::<Vec<String>>().join("🦶 "),
+            self.body.string(),
+        )
+    }
+}
+
+impl Expression for FunctionLiteral {}
+
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
 type InfixParser =
     Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
@@ -362,7 +385,7 @@ impl Parser {
 
     fn register_exp_parsers(&mut self) {
         self.prefix_exp_parsers
-            .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
+            .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier().map(|exp| exp as Box<dyn Expression>)));
         self.prefix_exp_parsers
             .insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
         self.prefix_exp_parsers
@@ -381,12 +404,22 @@ impl Parser {
 
         self.prefix_exp_parsers
             .insert(TokenType::If, Rc::new(|p| p.parse_if_expression()));
+        self.prefix_exp_parsers
+            .insert(TokenType::Function, Rc::new(|p| p.parse_function_literal()));
 
         self.prefix_exp_parsers.insert(
             TokenType::LParenthesis,
             Rc::new(|p| p.parse_group_expression()),
         );
 
+        self.infix_exp_parsers.insert(
+            TokenType::Or,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
+            TokenType::And,
+            Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
         self.infix_exp_parsers.insert(
             TokenType::Equal,
             Rc::new(|p, left| p.parse_infix_expression(left)),
@@ -568,7 +601,7 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_identifier(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_identifier(&self) -> Result<Box<Identifier>, String> {
         let token = self.tokens.current().unwrap().clone();
         Ok(Box::new(Identifier {
             token: token.clone(),
@@ -696,6 +729,53 @@ impl Parser {
             alternative,
         }))
     }
+
+    fn parse_function_literal(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let mut name = None;
+        let mut parameters = vec![];
+
+        if self.tokens.is_next_match(|token| token.token_type == TokenType::Identifier) {
+            self.tokens.to_next();
+            name = Some(self.parse_identifier()?);
+        }
+
+        if self.tokens.is_next_match(|token| token.token_type != TokenType::LParenthesis) {
+            return Err("Expected a left parenthesis".to_string());
+        }
+
+        self.tokens.to_next();
+        
+        while let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis) {
+            if token.token_type != TokenType::Identifier {
+                return Err(format!("Expected a identifier, but got a {}", token.literal));
+            }
+            parameters.push(self.parse_identifier()?);
+
+            if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
+                continue;
+            }
+
+            if let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::Comma) {
+                return Err(format!("Expected a comma, but got a {}", token.literal));
+            }
+        }
+
+        if self.tokens.is_next_match(|token| token.token_type != TokenType::LBrace) {
+            return Err("Expected a left brace".to_string());
+        }
+
+        self.tokens.to_next();
+        let body = self.parse_block_statement()?;
+
+        Ok(Box::new(FunctionLiteral {
+            token,
+            name,
+            parameters,
+            body,
+            
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -706,42 +786,31 @@ mod parser_test {
     fn test() {
         let source = String::from(
                 "
-            ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
-            ⬅️ 3️⃣ ↙️
-            ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
-            ➖8️⃣ ▶️🟰 ➖3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
-            ⏸️🌜❌🟰0️⃣◀️1️⃣🌛↙️
+        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
+        ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
+        📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
+          🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
+        🫷
+        ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛
             ",
         );
+        let target_statements = vec![
+            "㊙️🔢 ⬅️ 🌜1️⃣ ➕ 🌜3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣🌛🌛 ↙️",
+            "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️",
+            "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
+            "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️"
+        ];
+        let target_errors = vec![
+            "Expected a expression, but got a ⬅️",
+        ];
 
         let mut lexer = Lexer::new(&source);
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
-
-        assert_eq!(program.statements.len(), 5);
-        assert_eq!(program.statements[0].token_literal(), "⬅️");
-        assert_eq!(
-            program.statements[0].string(),
-            "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️"
-        );
-        assert_eq!(program.statements[1].token_literal(), "3");
-        assert_eq!(program.statements[1].string(), "3️⃣ ↙️");
-        assert_eq!(program.statements[2].token_literal(), "❓");
-        assert_eq!(
-            program.statements[2].string(),
-            "❓ 🌜🅰️ ▶️ 🅱️🌛 🫸🅰️ ↙️🫷 ❗ 🫸🅱️ ↙️🫷 ↙️"
-        );
-        assert_eq!(program.statements[3].token_literal(), "➖");
-        assert_eq!(
-            program.statements[3].string(),
-            "🌜🌜➖8️⃣🌛 ▶️🟰 🌜🌜➖3️⃣⚪9️⃣🌛 ✖️ 2️⃣🌛🌛 ↙️"
-        );
-        assert_eq!(program.statements[4].token_literal(), "⏸️");
-        assert_eq!(
-            program.statements[4].string(),
-            "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️"
-        );
-        assert_eq!(parser.errors.len(), 1);
-        assert!(parser.errors[0].contains("⬅️"));
+        
+        assert_eq!(program.statements.len(), target_statements.len());
+        assert_eq!(program.string(), target_statements.join(""));
+        assert_eq!(parser.errors.len(), target_errors.len());
+        assert_eq!(parser.errors, target_errors);
     }
 }
