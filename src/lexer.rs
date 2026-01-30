@@ -86,9 +86,11 @@ pub struct Lexer<'a> {
     chars: StatefulVector<&'a str>,
 }
 
-impl <'a> Lexer<'a> {
+impl<'a> Lexer<'a> {
     pub fn new(input: &'a str) -> Lexer<'a> {
-        Lexer { chars: StatefulVector::from_vec(input.graphemes(true).collect::<Vec<&str>>()) }
+        Lexer {
+            chars: StatefulVector::from_vec(input.graphemes(true).collect::<Vec<&str>>()),
+        }
     }
 
     pub fn tokenize(&mut self) -> StatefulVector<Token> {
@@ -106,8 +108,16 @@ impl <'a> Lexer<'a> {
                 "➗" => Token::from_str(TokenType::Divide, char),
                 "〰️" => Token::from_str(TokenType::Modulo, char),
                 "🟰" => Token::from_str(TokenType::Equal, char),
-                "▶️" => self.handle_two_chars_token(TokenType::GreaterThan, "🟰", TokenType::GreaterThanOrEqual),
-                "◀️" => self.handle_two_chars_token(TokenType::LessThan, "🟰", TokenType::LessThanOrEqual),
+                "▶️" => self.handle_two_chars_token(
+                    TokenType::GreaterThan,
+                    "🟰",
+                    TokenType::GreaterThanOrEqual,
+                ),
+                "◀️" => self.handle_two_chars_token(
+                    TokenType::LessThan,
+                    "🟰",
+                    TokenType::LessThanOrEqual,
+                ),
                 "🔁" => Token::from_str(TokenType::And, char),
                 "🔀" => Token::from_str(TokenType::Or, char),
                 "⏸️" => Token::from_str(TokenType::Not, char),
@@ -137,15 +147,20 @@ impl <'a> Lexer<'a> {
         tokens
     }
 
-    fn handle_two_chars_token(&mut self, single_char_token_type: TokenType, expected_next_char: &str, two_chars_token_type:TokenType) -> Token {
+    fn handle_two_chars_token(
+        &mut self,
+        single_char_token_type: TokenType,
+        expected_next_char: &str,
+        two_chars_token_type: TokenType,
+    ) -> Token {
         let mut current_char = String::from(*self.chars.current().unwrap());
         let mut token_type = single_char_token_type;
-        
+
         if self.chars.is_next_eq(&expected_next_char) {
             token_type = two_chars_token_type;
             current_char.push_str(self.chars.to_next().unwrap());
         }
-        
+
         Token::from(token_type, current_char)
     }
 
@@ -195,7 +210,6 @@ fn is_identifier_char(char: &str) -> bool {
         && !SPACES.contains(&char)
 }
 
-
 #[cfg(test)]
 mod lexer_test {
     use super::*;
@@ -204,7 +218,7 @@ mod lexer_test {
     fn test() {
         let source = String::from(
             "
-        ㊙️🔢 ⬅️ 3️⃣⚪9️⃣ ✖️ 2️⃣ ↙️
+        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
@@ -213,16 +227,18 @@ mod lexer_test {
           🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
-        🅰️🅱️
+        ⏸️🌜❌🟰0️⃣◀️1️⃣🌛
         ",
         );
         let target = vec![
             Token::start(),
             Token::from_str(TokenType::Identifier, "㊙️🔢"),
             Token::from_str(TokenType::Assign, "⬅️"),
+            Token::from_str(TokenType::Integer, "1"),
+            Token::from_str(TokenType::Plus, "➕"),
             Token::from_str(TokenType::Float, "3.9"),
             Token::from_str(TokenType::Multiply, "✖️"),
-            Token::from_str(TokenType::Integer, "2"),
+            Token::from_str(TokenType::Integer, "72"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::Identifier, "㊙️🔡"),
             Token::from_str(TokenType::Assign, "⬅️"),
@@ -272,7 +288,14 @@ mod lexer_test {
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::RBrace, "🫷"),
-            Token::from_str(TokenType::Identifier, "🅰️🅱️"),
+            Token::from_str(TokenType::Not, "⏸️"),
+            Token::from_str(TokenType::LParenthesis, "🌜"),
+            Token::from_str(TokenType::False, "❌"),
+            Token::from_str(TokenType::Equal, "🟰"),
+            Token::from_str(TokenType::Integer, "0"),
+            Token::from_str(TokenType::LessThan, "◀️"),
+            Token::from_str(TokenType::Integer, "1"),
+            Token::from_str(TokenType::RParenthesis, "🌛"),
         ];
         let mut lexer = Lexer::new(&source);
         assert_eq!(lexer.tokenize().to_vec(), target);
