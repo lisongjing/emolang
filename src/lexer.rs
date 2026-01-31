@@ -51,13 +51,14 @@ pub enum TokenType {
     String,
 }
 
-const RESERVED_SYMBOLS: [&str; 29] = [
+const RESERVED_SYMBOLS: [&str; 31] = [
     "⬅️", "➕", "➖", "✖️", "➗", "〰️", "🟰", "▶️", "◀️", "🔁", "🔀", "⏸️", "↙️", "🦶", "🌜", "🌛",
-    "👉", "👈", "🫸", "🫷", "🗨️", "💬", "✔️", "❌", "❓", "❗", "⭕", "📛", "🔙",
+    "👉", "👈", "🫸", "🫷", "🗨️", "💬", "✔️", "❌", "❓", "❗", "⁉️", "⭕", "📛", "🔙", "#️⃣",
 ];
 const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
-const SPACES: [&str; 5] = [" ", "\t", "\r", "\n", "\r\n"];
+const SPACES: [&str; 5] = [" ", "\t", NEWLINE[0], NEWLINE[1], NEWLINE[2]];
+const NEWLINE: [&str; 3] = ["\r", "\n", "\r\n"];
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
@@ -101,6 +102,7 @@ impl<'a> Lexer<'a> {
 
         while let Some(char) = self.chars.to_next() {
             let token = match *char {
+                "#️⃣" => { self.skip_comment(); continue; },
                 "⬅️" => Token::from_str(TokenType::Assign, char),
                 "➕" => Token::from_str(TokenType::Plus, char),
                 "➖" => Token::from_str(TokenType::Minus, char),
@@ -201,6 +203,10 @@ impl<'a> Lexer<'a> {
         }
         Token::from(TokenType::Identifier, literal)
     }
+
+    fn skip_comment(&mut self) {
+        while self.chars.to_next().is_some_and(|&char| !NEWLINE.contains(&char)) {}
+    }
 }
 
 fn is_identifier_char(char: &str) -> bool {
@@ -218,7 +224,7 @@ mod lexer_test {
     fn test() {
         let source = String::from(
             "
-        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
+        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️ #️⃣test assign statement
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
