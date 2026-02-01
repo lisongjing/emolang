@@ -29,6 +29,9 @@ static OPERATOR_PRECEDENCES: OnceLock<HashMap<TokenType, Precedence>> = OnceLock
 fn get_operator_precedence(token: &Token) -> &Precedence {
     let map = OPERATOR_PRECEDENCES.get_or_init(|| {
         let mut map = HashMap::new();
+        map.insert(TokenType::Or, Precedence::Or);
+        map.insert(TokenType::And, Precedence::And);
+
         map.insert(TokenType::Equal, Precedence::Equals);
         map.insert(TokenType::NotEqual, Precedence::Equals);
 
@@ -333,6 +336,30 @@ impl Node for IfExpression {
 impl Expression for IfExpression {}
 
 #[derive(Debug)]
+pub struct WhileExpression {
+    token: Token,
+    condition: Box<dyn Expression>,
+    body: Box<BlockStatement>,
+}
+
+impl Node for WhileExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!(
+            "{} {} {}",
+            self.token_literal(),
+            self.condition.string(),
+            self.body.string(),
+        )
+    }
+}
+
+impl Expression for WhileExpression {}
+
+#[derive(Debug)]
 pub struct FunctionLiteral {
     token: Token,
     name: Option<Box<Identifier>>,
@@ -404,6 +431,8 @@ impl Parser {
 
         self.prefix_exp_parsers
             .insert(TokenType::If, Rc::new(|p| p.parse_if_expression()));
+        self.prefix_exp_parsers
+            .insert(TokenType::While, Rc::new(|p| p.parse_while_expression()));
         self.prefix_exp_parsers
             .insert(TokenType::Function, Rc::new(|p| p.parse_function_literal()));
 
@@ -692,7 +721,6 @@ impl Parser {
         self.tokens.to_next();
         let condition = self.parse_expression(Precedence::Lowest)?;
 
-
         if self
             .tokens
             .is_next_match(|token| token.token_type != TokenType::LBrace)
@@ -727,6 +755,31 @@ impl Parser {
             condition,
             consequence,
             alternative,
+        }))
+    }
+
+    fn parse_while_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+
+        self.tokens.to_next();
+        let condition = self.parse_expression(Precedence::Lowest)?;
+
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::LBrace)
+        {
+            return Err(String::from(
+                "Expected a block statement after while-condition",
+            ));
+        }
+
+        self.tokens.to_next();
+        let body = self.parse_block_statement()?;
+
+        Ok(Box::new(WhileExpression {
+            token,
+            condition,
+            body,
         }))
     }
 
@@ -789,10 +842,10 @@ mod parser_test {
         ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
-          #️⃣⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
-          #️⃣  🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
-          #️⃣  🅱️ ⬅️ 🅱️ ➖ 🅰️ ↙️
-          #️⃣🫷
+          ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
+            🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
+            🅱️ ⬅️ 🅱️ ➖ 🅰️ ↙️
+          🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
         ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛
@@ -801,7 +854,7 @@ mod parser_test {
         let target_statements = [
             "㊙️🔢 ⬅️ 🌜1️⃣ ➕ 🌜3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣🌛🌛 ↙️",
             "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️",
-            "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
+            "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️"
         ];
         let target_errors = vec![
@@ -811,7 +864,7 @@ mod parser_test {
         let mut lexer = Lexer::new(&source);
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
-        
+
         assert_eq!(program.statements.len(), target_statements.len());
         assert_eq!(program.string(), target_statements.join(""));
         assert_eq!(parser.errors.len(), target_errors.len());
