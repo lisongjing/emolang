@@ -47,6 +47,8 @@ fn get_operator_precedence(token: &Token) -> &Precedence {
         map.insert(TokenType::Divide, Precedence::Product);
         map.insert(TokenType::Modulo, Precedence::Product);
 
+        map.insert(TokenType::LParenthesis, Precedence::Call);
+
         map
     });
     map.get(&token.token_type).unwrap_or(&Precedence::Lowest)
@@ -385,6 +387,29 @@ impl Node for FunctionLiteral {
 
 impl Expression for FunctionLiteral {}
 
+#[derive(Debug)]
+pub struct CallExpression {
+    token: Token,
+    function: Box<dyn Expression>,
+    arguments: Vec<Box<dyn Expression>>,
+}
+
+impl Node for CallExpression {
+    fn token_literal(&self) -> &str {
+        &self.token.literal
+    }
+
+    fn string(&self) -> String {
+        format!(
+            "{}🌜{}🌛",
+            self.function.string(),
+            self.arguments.iter().map(|exp| exp.string()).collect::<Vec<String>>().join("🦶 "),
+        )
+    }
+}
+
+impl Expression for CallExpression {}
+
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
 type InfixParser =
     Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
@@ -492,6 +517,11 @@ impl Parser {
         self.infix_exp_parsers.insert(
             TokenType::Modulo,
             Rc::new(|p, left| p.parse_infix_expression(left)),
+        );
+
+        self.infix_exp_parsers.insert(
+            TokenType::LParenthesis,
+            Rc::new(|p, left| p.parse_call_expression(left)),
         );
     }
 
@@ -829,6 +859,32 @@ impl Parser {
             
         }))
     }
+
+    fn parse_call_expression(
+        &mut self,
+        function: Box<dyn Expression>,
+    ) -> Result<Box<dyn Expression>, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let mut arguments = vec![];
+
+        while self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis).is_some() {
+            arguments.push(self.parse_expression(Precedence::Lowest)?);
+
+            if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
+                continue;
+            }
+
+            if let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::Comma) {
+                return Err(format!("Expected a comma, but got a {}", token.literal));
+            }
+        }
+
+        Ok(Box::new(CallExpression {
+            token,
+            function,
+            arguments,
+        }))
+    }
 }
 
 #[cfg(test)]
@@ -848,14 +904,16 @@ mod parser_test {
           🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
-        ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛
+        ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛 ↙️
+        🈯 🌜🅰️🦶 🅱️🌛
             ",
         );
         let target_statements = [
             "㊙️🔢 ⬅️ 🌜1️⃣ ➕ 🌜3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣🌛🌛 ↙️",
             "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️",
             "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
-            "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️"
+            "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
+            "🈯🌜🅰️🦶 🅱️🌛 ↙️"
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",
