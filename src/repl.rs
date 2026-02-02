@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::lexer::Lexer;
+use crate::{lexer::Lexer, parser::{Node, Parser}};
 
 
 pub fn start() {
@@ -9,8 +9,14 @@ pub fn start() {
         io::stdout().flush().expect("Cannot write to console output");
         let mut line = String::new();
         io::stdin().read_line(&mut line).expect("Cannot read from console input");
-        for token in Lexer::new(&line).tokenize().iter() {
-            println!("{token:?}");
+        let mut lexer = Lexer::new(&line);
+        let mut parser= Parser::new(&mut lexer);
+        let program = parser.parse_program();
+
+        if !parser.errors().is_empty() {
+            println!("Paser errors:\n{}", parser.errors().join("\n"));
+            continue;
         }
+        println!("{}", program.string());
     }
 }

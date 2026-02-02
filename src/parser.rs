@@ -435,6 +435,10 @@ impl Parser {
         parser
     }
 
+    pub fn errors(&self) -> &Vec<String> {
+        &self.errors
+    }
+
     fn register_exp_parsers(&mut self) {
         self.prefix_exp_parsers
             .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier().map(|exp| exp as Box<dyn Expression>)));
