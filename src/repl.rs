@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::{lexer::Lexer, parser::{Node, Parser}};
+use crate::{lexer::Lexer, parser::Parser, types::Node};
 
 
 pub fn start() {
