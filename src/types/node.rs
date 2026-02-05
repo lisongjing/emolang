@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Debug, sync::OnceLock};
+use std::fmt::Debug;
 
 use crate::types::{Token, TokenType};
 
@@ -15,34 +15,27 @@ pub enum Precedence {
     Call,        // fn🌜🌛
 }
 
-static OPERATOR_PRECEDENCES: OnceLock<HashMap<TokenType, Precedence>> = OnceLock::new();
 
-pub fn get_operator_precedence(token: &Token) -> &Precedence {
-    let map = OPERATOR_PRECEDENCES.get_or_init(|| {
-        let mut map = HashMap::new();
-        map.insert(TokenType::Or, Precedence::Or);
-        map.insert(TokenType::And, Precedence::And);
-
-        map.insert(TokenType::Equal, Precedence::Equals);
-        map.insert(TokenType::NotEqual, Precedence::Equals);
-
-        map.insert(TokenType::LessThan, Precedence::LessGreater);
-        map.insert(TokenType::LessThanOrEqual, Precedence::LessGreater);
-        map.insert(TokenType::GreaterThan, Precedence::LessGreater);
-        map.insert(TokenType::GreaterThanOrEqual, Precedence::LessGreater);
-
-        map.insert(TokenType::Plus, Precedence::Sum);
-        map.insert(TokenType::Minus, Precedence::Sum);
-
-        map.insert(TokenType::Multiply, Precedence::Product);
-        map.insert(TokenType::Divide, Precedence::Product);
-        map.insert(TokenType::Modulo, Precedence::Product);
-
-        map.insert(TokenType::LParenthesis, Precedence::Call);
-
-        map
-    });
-    map.get(&token.token_type).unwrap_or(&Precedence::Lowest)
+impl Precedence {
+    pub fn get_operator_precedence(token: &Token) -> Precedence {
+        match token.token_type {
+            TokenType::Or => Precedence::Or,
+            TokenType::And => Precedence::And,
+            TokenType::Equal => Precedence::Equals,
+            TokenType::NotEqual => Precedence::Equals,
+            TokenType::LessThan => Precedence::LessGreater,
+            TokenType::LessThanOrEqual => Precedence::LessGreater,
+            TokenType::GreaterThan => Precedence::LessGreater,
+            TokenType::GreaterThanOrEqual => Precedence::LessGreater,
+            TokenType::Plus => Precedence::Sum,
+            TokenType::Minus => Precedence::Sum,
+            TokenType::Multiply => Precedence::Product,
+            TokenType::Divide => Precedence::Product,
+            TokenType::Modulo => Precedence::Product,
+            TokenType::LParenthesis => Precedence::Call,
+            _ => Precedence::Lowest
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

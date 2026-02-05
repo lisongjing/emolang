@@ -247,7 +247,7 @@ impl Parser {
 
         while self.tokens.is_next_match(|next_token| {
             next_token.token_type != TokenType::Semicolon
-                && precedence < *get_operator_precedence(next_token)
+                && precedence < Precedence::get_operator_precedence(next_token)
         }) {
             if let Some(infix) = self
                 .tokens
@@ -322,7 +322,7 @@ impl Parser {
     ) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
-        let precedence = *get_operator_precedence(self.tokens.current().unwrap());
+        let precedence = Precedence::get_operator_precedence(self.tokens.current().unwrap());
         self.tokens.to_next();
         let right = Box::new(self.parse_expression(precedence)?);
         Ok(Node::InfixExpression {
