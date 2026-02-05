@@ -131,47 +131,47 @@ impl Node {
                 .first()
                 .map(|stmt| stmt.token_literal())
                 .unwrap_or_default(),
-            Node::AssignStatement { token, name, value } => &token.literal,
-            Node::ReturnStatement { token, value } => &token.literal,
-            Node::ExpressionStatement { token, expression } => &token.literal,
-            Node::BlockStatement { token, statements } => &token.literal,
-            Node::Identifier { token, value } => &token.literal,
-            Node::IntegerLiteral { token, value } => &token.literal,
-            Node::FloatLiteral { token, value } => &token.literal,
-            Node::BooleanLiteral { token, value } => &token.literal,
-            Node::StringLiteral { token, value } => &token.literal,
+            Node::AssignStatement { token, name: _, value: _ } => &token.literal,
+            Node::ReturnStatement { token, value: _ } => &token.literal,
+            Node::ExpressionStatement { token, expression: _ } => &token.literal,
+            Node::BlockStatement { token, statements: _ } => &token.literal,
+            Node::Identifier { token, value: _ } => &token.literal,
+            Node::IntegerLiteral { token, value: _ } => &token.literal,
+            Node::FloatLiteral { token, value: _ } => &token.literal,
+            Node::BooleanLiteral { token, value: _ } => &token.literal,
+            Node::StringLiteral { token, value: _ } => &token.literal,
             Node::PrefixExpression {
                 token,
-                operator,
-                right,
+                operator: _,
+                right: _,
             } => &token.literal,
             Node::InfixExpression {
                 token,
-                left,
-                operator,
-                right,
+                left: _,
+                operator: _,
+                right: _,
             } => &token.literal,
             Node::IfExpression {
                 token,
-                condition,
-                consequence,
-                alternative,
+                condition: _,
+                consequence: _,
+                alternative: _,
             } => &token.literal,
             Node::WhileExpression {
                 token,
-                condition,
-                body,
+                condition: _,
+                body: _,
             } => &token.literal,
             Node::FunctionLiteral {
                 token,
-                name,
-                parameters,
-                body,
+                name: _,
+                parameters: _,
+                body: _,
             } => &token.literal,
             Node::CallExpression {
                 token,
-                function,
-                arguments,
+                function: _,
+                arguments: _,
             } => &token.literal,
         }
     }
@@ -185,7 +185,7 @@ impl Node {
             Node::ReturnStatement { token, value } => {
                 format!("{} {} ↙️", token.literal, value.string())
             }
-            Node::ExpressionStatement { token, expression } => {
+            Node::ExpressionStatement { token: _, expression } => {
                 format!("{} ↙️", expression.string())
             }
             Node::BlockStatement { token, statements } => format!(
@@ -196,13 +196,13 @@ impl Node {
                     .map(|stmt| stmt.string())
                     .collect::<String>()
             ),
-            Node::Identifier { token, value } => value.clone(),
-            Node::IntegerLiteral { token, value } => value
+            Node::Identifier { token: _, value } => value.clone(),
+            Node::IntegerLiteral { token: _, value } => value
                 .to_string()
                 .chars()
                 .map(|digital| format!("{digital}\u{fe0f}\u{20e3}"))
                 .collect(),
-            Node::FloatLiteral { token, value } => value
+            Node::FloatLiteral { token: _, value } => value
                 .to_string()
                 .chars()
                 .map(|char| {
@@ -213,15 +213,15 @@ impl Node {
                     }
                 })
                 .collect(),
-            Node::BooleanLiteral { token, value } => token.literal.clone(),
-            Node::StringLiteral { token, value } => format!("🗨️{}💬", value),
+            Node::BooleanLiteral { token, value: _ } => token.literal.clone(),
+            Node::StringLiteral { token: _, value } => format!("🗨️{}💬", value),
             Node::PrefixExpression {
-                token,
+                token: _,
                 operator,
                 right,
             } => format!("🌜{}{}🌛", operator, right.string()),
             Node::InfixExpression {
-                token,
+                token: _,
                 left,
                 operator,
                 right,
@@ -265,7 +265,7 @@ impl Node {
                 body.string(),
             ),
             Node::CallExpression {
-                token,
+                token: _,
                 function,
                 arguments,
             } => format!(
