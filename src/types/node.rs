@@ -45,375 +45,238 @@ pub fn get_operator_precedence(token: &Token) -> &Precedence {
     map.get(&token.token_type).unwrap_or(&Precedence::Lowest)
 }
 
-pub trait Node: Debug {
-    fn token_literal(&self) -> &str;
-    fn string(&self) -> String;
+#[derive(Debug, Clone)]
+pub enum Node {
+    Program {
+        statements: Vec<Box<Node>>,
+    },
+    // Statement
+    AssignStatement {
+        token: Token,
+        name: Box<Node>,
+        value: Box<Node>,
+    },
+    ReturnStatement {
+        token: Token,
+        value: Box<Node>,
+    },
+    ExpressionStatement {
+        token: Token,
+        expression: Box<Node>,
+    },
+    BlockStatement {
+        token: Token,
+        statements: Vec<Box<Node>>,
+    },
+    // Expression
+    Identifier {
+        token: Token,
+        value: String,
+    },
+    IntegerLiteral {
+        token: Token,
+        value: i64,
+    },
+    FloatLiteral {
+        token: Token,
+        value: f64,
+    },
+    BooleanLiteral {
+        token: Token,
+        value: bool,
+    },
+    StringLiteral {
+        token: Token,
+        value: String,
+    },
+    PrefixExpression {
+        token: Token,
+        operator: String,
+        right: Box<Node>,
+    },
+    InfixExpression {
+        token: Token,
+        left: Box<Node>,
+        operator: String,
+        right: Box<Node>,
+    },
+    IfExpression {
+        token: Token,
+        condition: Box<Node>,
+        consequence: Box<Node>,
+        alternative: Option<Box<Node>>,
+    },
+    WhileExpression {
+        token: Token,
+        condition: Box<Node>,
+        body: Box<Node>,
+    },
+    FunctionLiteral {
+        token: Token,
+        name: Option<Box<Node>>,
+        parameters: Vec<Box<Node>>,
+        body: Box<Node>,
+    },
+    CallExpression {
+        token: Token,
+        function: Box<Node>,
+        arguments: Vec<Box<Node>>,
+    },
 }
 
-pub trait Statement: Node {}
-
-pub trait Expression: Node {}
-
-#[derive(Debug)]
-pub struct Program {
-    pub statements: Vec<Box<dyn Statement>>,
-}
-
-impl Node for Program {
-    fn token_literal(&self) -> &str {
-        self.statements
-            .first()
-            .map(|stmt| stmt.token_literal())
-            .unwrap_or_default()
-    }
-
-    fn string(&self) -> String {
-        self.statements.iter().map(|stmt| stmt.string()).collect()
-    }
-}
-
-#[derive(Debug)]
-pub struct AssignStatement {
-    pub token: Token,
-    pub name: Identifier,
-    pub value: Box<dyn Expression>,
-}
-
-impl Node for AssignStatement {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!(
-            "{} {} {} ↙️",
-            self.name.string(),
-            self.token.literal,
-            self.value.string(),
-        )
-    }
-}
-
-impl Statement for AssignStatement {}
-
-#[derive(Debug)]
-pub struct ReturnStatement {
-    pub token: Token,
-    pub value: Box<dyn Expression>,
-}
-
-impl Node for ReturnStatement {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!("{} {} ↙️", self.token.literal, self.value.string(),)
-    }
-}
-
-impl Statement for ReturnStatement {}
-
-#[derive(Debug)]
-pub struct ExpressionStatement {
-    pub token: Token,
-    pub expression: Box<dyn Expression>,
-}
-
-impl Node for ExpressionStatement {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!("{} ↙️", self.expression.string())
-    }
-}
-
-impl Statement for ExpressionStatement {}
-
-#[derive(Debug)]
-pub struct BlockStatement {
-    pub token: Token,
-    pub statements: Vec<Box<dyn Statement>>,
-}
-
-impl Node for BlockStatement {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!(
-            "{} {} 🫷",
-            self.token_literal(),
-            self.statements
-                .iter()
-                .map(|stmt| stmt.string())
-                .collect::<String>()
-        )
-    }
-}
-
-impl Statement for BlockStatement {}
-
-#[derive(Debug)]
-pub struct Identifier {
-    pub token: Token,
-    pub value: String,
-}
-
-impl Node for Identifier {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        self.value.clone()
-    }
-}
-
-impl Expression for Identifier {}
-
-#[derive(Debug)]
-pub struct IntegerLiteral {
-    pub token: Token,
-    pub value: i64,
-}
-
-impl Node for IntegerLiteral {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        self.value
-            .to_string()
-            .chars()
-            .map(|digital| format!("{digital}\u{fe0f}\u{20e3}"))
-            .collect()
-    }
-}
-
-impl Expression for IntegerLiteral {}
-
-#[derive(Debug)]
-pub struct FloatLiteral {
-    pub token: Token,
-    pub value: f64,
-}
-
-impl Node for FloatLiteral {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        self.value
-            .to_string()
-            .chars()
-            .map(|char| {
-                if char == '.' {
-                    "\u{26aa}".to_string()
-                } else {
-                    format!("{char}\u{fe0f}\u{20e3}")
-                }
-            })
-            .collect()
-    }
-}
-
-impl Expression for FloatLiteral {}
-
-#[derive(Debug)]
-pub struct BooleanLiteral {
-    pub token: Token,
-    pub value: bool,
-}
-
-impl Node for BooleanLiteral {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        String::from(self.token_literal())
-    }
-}
-
-impl Expression for BooleanLiteral {}
-
-#[derive(Debug)]
-pub struct StringLiteral {
-    pub token: Token,
-    pub value: String,
-}
-
-impl Node for StringLiteral {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!("🗨️{}💬", self.value)
-    }
-}
-
-impl Expression for StringLiteral {}
-
-#[derive(Debug)]
-pub struct PrefixExpression {
-    pub token: Token,
-    pub operator: String,
-    pub right: Box<dyn Expression>,
-}
-
-impl Node for PrefixExpression {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!("🌜{}{}🌛", self.operator, self.right.string())
-    }
-}
-
-impl Expression for PrefixExpression {}
-
-#[derive(Debug)]
-pub struct InfixExpression {
-    pub token: Token,
-    pub left: Box<dyn Expression>,
-    pub operator: String,
-    pub right: Box<dyn Expression>,
-}
-
-impl Node for InfixExpression {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!(
-            "🌜{} {} {}🌛",
-            self.left.string(),
-            self.operator,
-            self.right.string()
-        )
-    }
-}
-
-impl Expression for InfixExpression {}
-
-#[derive(Debug)]
-pub struct IfExpression {
-    pub token: Token,
-    pub condition: Box<dyn Expression>,
-    pub consequence: Box<BlockStatement>,
-    pub alternative: Option<Box<BlockStatement>>,
-}
-
-impl Node for IfExpression {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        let mut string = format!(
-            "{} {} {}",
-            self.token_literal(),
-            self.condition.string(),
-            self.consequence.string()
-        );
-        if let Some(stmt) = &self.alternative {
-            string.push_str(" ❗ ");
-            string.push_str(&stmt.string());
+impl Node {
+    pub fn token_literal(&self) -> &str {
+        match self {
+            Node::Program { statements } => statements
+                .first()
+                .map(|stmt| stmt.token_literal())
+                .unwrap_or_default(),
+            Node::AssignStatement { token, name, value } => &token.literal,
+            Node::ReturnStatement { token, value } => &token.literal,
+            Node::ExpressionStatement { token, expression } => &token.literal,
+            Node::BlockStatement { token, statements } => &token.literal,
+            Node::Identifier { token, value } => &token.literal,
+            Node::IntegerLiteral { token, value } => &token.literal,
+            Node::FloatLiteral { token, value } => &token.literal,
+            Node::BooleanLiteral { token, value } => &token.literal,
+            Node::StringLiteral { token, value } => &token.literal,
+            Node::PrefixExpression {
+                token,
+                operator,
+                right,
+            } => &token.literal,
+            Node::InfixExpression {
+                token,
+                left,
+                operator,
+                right,
+            } => &token.literal,
+            Node::IfExpression {
+                token,
+                condition,
+                consequence,
+                alternative,
+            } => &token.literal,
+            Node::WhileExpression {
+                token,
+                condition,
+                body,
+            } => &token.literal,
+            Node::FunctionLiteral {
+                token,
+                name,
+                parameters,
+                body,
+            } => &token.literal,
+            Node::CallExpression {
+                token,
+                function,
+                arguments,
+            } => &token.literal,
         }
-        string
-    }
-}
-
-impl Expression for IfExpression {}
-
-#[derive(Debug)]
-pub struct WhileExpression {
-    pub token: Token,
-    pub condition: Box<dyn Expression>,
-    pub body: Box<BlockStatement>,
-}
-
-impl Node for WhileExpression {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
     }
 
-    fn string(&self) -> String {
-        format!(
-            "{} {} {}",
-            self.token_literal(),
-            self.condition.string(),
-            self.body.string(),
-        )
+    pub fn string(&self) -> String {
+        match self {
+            Node::Program { statements } => statements.iter().map(|stmt| stmt.string()).collect(),
+            Node::AssignStatement { token, name, value } => {
+                format!("{} {} {} ↙️", name.string(), token.literal, value.string())
+            }
+            Node::ReturnStatement { token, value } => {
+                format!("{} {} ↙️", token.literal, value.string())
+            }
+            Node::ExpressionStatement { token, expression } => {
+                format!("{} ↙️", expression.string())
+            }
+            Node::BlockStatement { token, statements } => format!(
+                "{} {} 🫷",
+                token.literal,
+                statements
+                    .iter()
+                    .map(|stmt| stmt.string())
+                    .collect::<String>()
+            ),
+            Node::Identifier { token, value } => value.clone(),
+            Node::IntegerLiteral { token, value } => value
+                .to_string()
+                .chars()
+                .map(|digital| format!("{digital}\u{fe0f}\u{20e3}"))
+                .collect(),
+            Node::FloatLiteral { token, value } => value
+                .to_string()
+                .chars()
+                .map(|char| {
+                    if char == '.' {
+                        "\u{26aa}".to_string()
+                    } else {
+                        format!("{char}\u{fe0f}\u{20e3}")
+                    }
+                })
+                .collect(),
+            Node::BooleanLiteral { token, value } => token.literal.clone(),
+            Node::StringLiteral { token, value } => format!("🗨️{}💬", value),
+            Node::PrefixExpression {
+                token,
+                operator,
+                right,
+            } => format!("🌜{}{}🌛", operator, right.string()),
+            Node::InfixExpression {
+                token,
+                left,
+                operator,
+                right,
+            } => format!("🌜{} {} {}🌛", left.string(), operator, right.string()),
+            Node::IfExpression {
+                token,
+                condition,
+                consequence,
+                alternative,
+            } => format!(
+                "{} {} {}{}",
+                token.literal,
+                condition.string(),
+                consequence.string(),
+                if let Some(stmt) = alternative {
+                    [" ❗", &stmt.string()].join(" ")
+                } else {
+                    String::new()
+                }
+            ),
+            Node::WhileExpression {
+                token,
+                condition,
+                body,
+            } => format!("{} {} {}", token.literal, condition.string(), body.string(),),
+            Node::FunctionLiteral {
+                token,
+                name,
+                parameters,
+                body,
+            } => format!(
+                "{} {}🌜{}🌛 {}",
+                token.literal,
+                name.as_ref()
+                    .map_or(String::new(), |ident| ident.string() + " "),
+                parameters
+                    .iter()
+                    .map(|ident| ident.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 "),
+                body.string(),
+            ),
+            Node::CallExpression {
+                token,
+                function,
+                arguments,
+            } => format!(
+                "{}🌜{}🌛",
+                function.string(),
+                arguments
+                    .iter()
+                    .map(|exp| exp.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 "),
+            ),
+        }
     }
 }
-
-impl Expression for WhileExpression {}
-
-#[derive(Debug)]
-pub struct FunctionLiteral {
-    pub token: Token,
-    pub name: Option<Box<Identifier>>,
-    pub parameters: Vec<Box<Identifier>>,
-    pub body: Box<BlockStatement>,
-}
-
-impl Node for FunctionLiteral {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!(
-            "{} {}🌜{}🌛 {}",
-            self.token_literal(),
-            self.name
-                .as_ref()
-                .map_or(String::new(), |ident| ident.string() + " "),
-            self.parameters
-                .iter()
-                .map(|ident| ident.string())
-                .collect::<Vec<String>>()
-                .join("🦶 "),
-            self.body.string(),
-        )
-    }
-}
-
-impl Expression for FunctionLiteral {}
-
-#[derive(Debug)]
-pub struct CallExpression {
-    pub token: Token,
-    pub function: Box<dyn Expression>,
-    pub arguments: Vec<Box<dyn Expression>>,
-}
-
-impl Node for CallExpression {
-    fn token_literal(&self) -> &str {
-        &self.token.literal
-    }
-
-    fn string(&self) -> String {
-        format!(
-            "{}🌜{}🌛",
-            self.function.string(),
-            self.arguments
-                .iter()
-                .map(|exp| exp.string())
-                .collect::<Vec<String>>()
-                .join("🦶 "),
-        )
-    }
-}
-
-impl Expression for CallExpression {}

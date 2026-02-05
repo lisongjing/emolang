@@ -10,9 +10,8 @@ use crate::{
     util::StatefulVector,
 };
 
-type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Box<dyn Expression>, String>>;
-type InfixParser =
-    Rc<dyn Fn(&mut Parser, Box<dyn Expression>) -> Result<Box<dyn Expression>, String>>;
+type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Node, String>>;
+type InfixParser = Rc<dyn Fn(&mut Parser, Node) -> Result<Node, String>>;
 
 pub struct Parser {
     tokens: StatefulVector<Token>,
@@ -41,7 +40,7 @@ impl Parser {
 
     fn register_exp_parsers(&mut self) {
         self.prefix_exp_parsers
-            .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier().map(|exp| exp as Box<dyn Expression>)));
+            .insert(TokenType::Identifier, Rc::new(|p| p.parse_identifier()));
         self.prefix_exp_parsers
             .insert(TokenType::Integer, Rc::new(|p| p.parse_integer_literal()));
         self.prefix_exp_parsers
@@ -129,30 +128,30 @@ impl Parser {
         );
     }
 
-    pub fn parse_program(&mut self) -> Program {
-        let mut program = Program { statements: vec![] };
+    pub fn parse_program(&mut self) -> Node {
+        let mut statements = vec![];
 
         while self.tokens.to_next().is_some() {
             let statement = self.parse_statement();
             match statement {
-                Ok(statement) => program.statements.push(statement),
+                Ok(statement) => statements.push(Box::new(statement)),
                 Err(error_msg) => self.errors.push(error_msg),
             }
         }
 
-        program
+        Node::Program { statements }
     }
 
-    fn parse_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+    fn parse_statement(&mut self) -> Result<Node, String> {
         match self.tokens.current().unwrap().token_type {
             TokenType::Identifier => self.parse_assign_statement(),
             TokenType::Return => self.parse_return_statement(),
-            TokenType::LBrace => self.parse_block_statement().map(|stmt| stmt as Box<dyn Statement>),
+            TokenType::LBrace => self.parse_block_statement(),
             _ => self.parse_expression_statement(),
         }
     }
 
-    fn parse_assign_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+    fn parse_assign_statement(&mut self) -> Result<Node, String> {
         if self
             .tokens
             .is_next_match(|tok| tok.token_type != TokenType::Assign)
@@ -161,14 +160,14 @@ impl Parser {
         }
 
         let identifier = self.tokens.current().unwrap().clone();
-        let identifier = Identifier {
+        let name = Box::new(Node::Identifier {
             token: identifier.clone(),
             value: identifier.literal,
-        };
+        });
         let assign_token = self.tokens.to_next().unwrap().clone();
 
         self.tokens.to_next();
-        let value = self.parse_expression(Precedence::Lowest)?;
+        let value = Box::new(self.parse_expression(Precedence::Lowest)?);
         while self
             .tokens
             .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
@@ -176,18 +175,18 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Box::new(AssignStatement {
+        Ok(Node::AssignStatement {
             token: assign_token,
-            name: identifier,
+            name,
             value,
-        }))
+        })
     }
 
-    fn parse_return_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+    fn parse_return_statement(&mut self) -> Result<Node, String> {
         let return_token = self.tokens.current().unwrap().clone();
 
         self.tokens.to_next();
-        let value = self.parse_expression(Precedence::Lowest)?;
+        let value = Box::new(self.parse_expression(Precedence::Lowest)?);
         while self
             .tokens
             .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
@@ -195,15 +194,15 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Box::new(ReturnStatement {
+        Ok(Node::ReturnStatement {
             token: return_token,
             value,
-        }))
+        })
     }
 
-    fn parse_expression_statement(&mut self) -> Result<Box<dyn Statement>, String> {
+    fn parse_expression_statement(&mut self) -> Result<Node, String> {
         let exp_token = self.tokens.current().unwrap().clone();
-        let exp = self.parse_expression(Precedence::Lowest)?;
+        let expression = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         while self
             .tokens
@@ -212,13 +211,13 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Box::new(ExpressionStatement {
+        Ok(Node::ExpressionStatement {
             token: exp_token,
-            expression: exp,
-        }))
+            expression,
+        })
     }
 
-    fn parse_block_statement(&mut self) -> Result<Box<BlockStatement>, String> {
+    fn parse_block_statement(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut statements = vec![];
 
@@ -230,14 +229,14 @@ impl Parser {
             .is_some_and(|token| token.token_type != TokenType::RBrace)
         {
             let stmt = self.parse_statement()?;
-            statements.push(stmt);
+            statements.push(Box::new(stmt));
             self.tokens.to_next();
         }
 
-        Ok(Box::new(BlockStatement { token, statements }))
+        Ok(Node::BlockStatement { token, statements })
     }
 
-    fn parse_expression(&mut self, precedence: Precedence) -> Result<Box<dyn Expression>, String> {
+    fn parse_expression(&mut self, precedence: Precedence) -> Result<Node, String> {
         let token = self.tokens.current().unwrap();
 
         let mut left = self
@@ -264,54 +263,54 @@ impl Parser {
         Ok(left)
     }
 
-    fn parse_identifier(&self) -> Result<Box<Identifier>, String> {
+    fn parse_identifier(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
-        Ok(Box::new(Identifier {
+        Ok(Node::Identifier {
             token: token.clone(),
             value: token.literal.clone(),
-        }))
+        })
     }
 
-    fn parse_integer_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_integer_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token
             .literal
             .parse()
             .map_err(|err: ParseIntError| err.to_string())?;
-        Ok(Box::new(IntegerLiteral { token, value }))
+        Ok(Node::IntegerLiteral { token, value })
     }
 
-    fn parse_float_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_float_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token
             .literal
             .parse()
             .map_err(|err: ParseFloatError| err.to_string())?;
-        Ok(Box::new(FloatLiteral { token, value }))
+        Ok(Node::FloatLiteral { token, value })
     }
 
-    fn parse_bool_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_bool_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token.token_type == TokenType::True;
-        Ok(Box::new(BooleanLiteral { token, value }))
+        Ok(Node::BooleanLiteral { token, value })
     }
 
-    fn parse_string_literal(&self) -> Result<Box<dyn Expression>, String> {
+    fn parse_string_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let value = token.literal.clone();
-        Ok(Box::new(StringLiteral { token, value }))
+        Ok(Node::StringLiteral { token, value })
     }
 
-    fn parse_prefix_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+    fn parse_prefix_expression(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
         if self.tokens.to_next().is_some() {
-            let right = self.parse_expression(Precedence::Prefix)?;
-            Ok(Box::new(PrefixExpression {
+            let right = Box::new(self.parse_expression(Precedence::Prefix)?);
+            Ok(Node::PrefixExpression {
                 token,
                 operator,
                 right,
-            }))
+            })
         } else {
             Err(format!("Expected a expression after operator {}", operator))
         }
@@ -319,22 +318,22 @@ impl Parser {
 
     fn parse_infix_expression(
         &mut self,
-        left: Box<dyn Expression>,
-    ) -> Result<Box<dyn Expression>, String> {
+        left: Node,
+    ) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
         let precedence = *get_operator_precedence(self.tokens.current().unwrap());
         self.tokens.to_next();
-        let right = self.parse_expression(precedence)?;
-        Ok(Box::new(InfixExpression {
+        let right = Box::new(self.parse_expression(precedence)?);
+        Ok(Node::InfixExpression {
             token,
-            left,
+            left: Box::new(left),
             operator,
             right,
-        }))
+        })
     }
 
-    fn parse_group_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+    fn parse_group_expression(&mut self) -> Result<Node, String> {
         self.tokens.to_next();
         let exp = self.parse_expression(Precedence::Lowest)?;
 
@@ -349,11 +348,11 @@ impl Parser {
         }
     }
 
-    fn parse_if_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+    fn parse_if_expression(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
 
         self.tokens.to_next();
-        let condition = self.parse_expression(Precedence::Lowest)?;
+        let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         if self
             .tokens
@@ -365,7 +364,7 @@ impl Parser {
         }
 
         self.tokens.to_next();
-        let consequence = self.parse_block_statement()?;
+        let consequence = Box::new(self.parse_block_statement()?);
 
         let alternative = if self
             .tokens
@@ -379,24 +378,24 @@ impl Parser {
                 return Err(String::from("Expected a block statement after else"));
             }
             self.tokens.to_next();
-            Some(self.parse_block_statement()?)
+            Some(Box::new(self.parse_block_statement()?))
         } else {
             None
         };
 
-        Ok(Box::new(IfExpression {
+        Ok(Node::IfExpression {
             token,
             condition,
             consequence,
             alternative,
-        }))
+        })
     }
 
-    fn parse_while_expression(&mut self) -> Result<Box<dyn Expression>, String> {
+    fn parse_while_expression(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
 
         self.tokens.to_next();
-        let condition = self.parse_expression(Precedence::Lowest)?;
+        let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         if self
             .tokens
@@ -408,23 +407,23 @@ impl Parser {
         }
 
         self.tokens.to_next();
-        let body = self.parse_block_statement()?;
+        let body = Box::new(self.parse_block_statement()?);
 
-        Ok(Box::new(WhileExpression {
+        Ok(Node::WhileExpression {
             token,
             condition,
             body,
-        }))
+        })
     }
 
-    fn parse_function_literal(&mut self) -> Result<Box<dyn Expression>, String> {
+    fn parse_function_literal(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut name = None;
         let mut parameters = vec![];
 
         if self.tokens.is_next_match(|token| token.token_type == TokenType::Identifier) {
             self.tokens.to_next();
-            name = Some(self.parse_identifier()?);
+            name = Some(Box::new(self.parse_identifier()?));
         }
 
         if self.tokens.is_next_match(|token| token.token_type != TokenType::LParenthesis) {
@@ -437,7 +436,7 @@ impl Parser {
             if token.token_type != TokenType::Identifier {
                 return Err(format!("Expected a identifier, but got a {}", token.literal));
             }
-            parameters.push(self.parse_identifier()?);
+            parameters.push(Box::new(self.parse_identifier()?));
 
             if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
                 continue;
@@ -453,26 +452,26 @@ impl Parser {
         }
 
         self.tokens.to_next();
-        let body = self.parse_block_statement()?;
+        let body = Box::new(self.parse_block_statement()?);
 
-        Ok(Box::new(FunctionLiteral {
+        Ok(Node::FunctionLiteral {
             token,
             name,
             parameters,
             body,
             
-        }))
+        })
     }
 
     fn parse_call_expression(
         &mut self,
-        function: Box<dyn Expression>,
-    ) -> Result<Box<dyn Expression>, String> {
+        function: Node,
+    ) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut arguments = vec![];
 
         while self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis).is_some() {
-            arguments.push(self.parse_expression(Precedence::Lowest)?);
+            arguments.push(Box::new(self.parse_expression(Precedence::Lowest)?));
 
             if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
                 continue;
@@ -483,11 +482,11 @@ impl Parser {
             }
         }
 
-        Ok(Box::new(CallExpression {
+        Ok(Node::CallExpression {
             token,
-            function,
+            function: Box::new(function),
             arguments,
-        }))
+        })
     }
 }
 
@@ -527,7 +526,9 @@ mod parser_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.statements.len(), target_statements.len());
+        if let Node::Program { statements } = &program {
+            assert_eq!(statements.len(), target_statements.len());
+        }
         assert_eq!(program.string(), target_statements.join(""));
         assert_eq!(parser.errors.len(), target_errors.len());
         assert_eq!(parser.errors, target_errors);
