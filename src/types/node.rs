@@ -1,5 +1,3 @@
-use std::fmt::Debug;
-
 use crate::types::{Token, TokenType};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
