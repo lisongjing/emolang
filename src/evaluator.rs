@@ -12,10 +12,10 @@ pub fn eval(node: Node) -> Result<Object, String> {
     }
 }
 
-fn eval_statements(statements: Vec<Box<Node>>) -> Result<Object, String> {
+fn eval_statements(statements: Vec<Node>) -> Result<Object, String> {
     let mut result = Err(String::from("Empty statements to evaluate values"));
     for statement in statements {
-        result = eval(*statement);
+        result = eval(statement);
     }
     result
 }

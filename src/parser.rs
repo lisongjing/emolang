@@ -134,7 +134,7 @@ impl Parser {
         while self.tokens.to_next().is_some() {
             let statement = self.parse_statement();
             match statement {
-                Ok(statement) => statements.push(Box::new(statement)),
+                Ok(statement) => statements.push(statement),
                 Err(error_msg) => self.errors.push(error_msg),
             }
         }
@@ -229,7 +229,7 @@ impl Parser {
             .is_some_and(|token| token.token_type != TokenType::RBrace)
         {
             let stmt = self.parse_statement()?;
-            statements.push(Box::new(stmt));
+            statements.push(stmt);
             self.tokens.to_next();
         }
 
@@ -436,7 +436,7 @@ impl Parser {
             if token.token_type != TokenType::Identifier {
                 return Err(format!("Expected a identifier, but got a {}", token.literal));
             }
-            parameters.push(Box::new(self.parse_identifier()?));
+            parameters.push(self.parse_identifier()?);
 
             if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
                 continue;
@@ -471,7 +471,7 @@ impl Parser {
         let mut arguments = vec![];
 
         while self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis).is_some() {
-            arguments.push(Box::new(self.parse_expression(Precedence::Lowest)?));
+            arguments.push(self.parse_expression(Precedence::Lowest)?);
 
             if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
                 continue;

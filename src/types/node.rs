@@ -39,7 +39,7 @@ impl Precedence {
 #[derive(Debug, Clone)]
 pub enum Node {
     Program {
-        statements: Vec<Box<Node>>,
+        statements: Vec<Node>,
     },
     // Statement
     AssignStatement {
@@ -57,7 +57,7 @@ pub enum Node {
     },
     BlockStatement {
         token: Token,
-        statements: Vec<Box<Node>>,
+        statements: Vec<Node>,
     },
     // Expression
     Identifier {
@@ -105,13 +105,13 @@ pub enum Node {
     FunctionLiteral {
         token: Token,
         name: Option<Box<Node>>,
-        parameters: Vec<Box<Node>>,
+        parameters: Vec<Node>,
         body: Box<Node>,
     },
     CallExpression {
         token: Token,
         function: Box<Node>,
-        arguments: Vec<Box<Node>>,
+        arguments: Vec<Node>,
     },
 }
 
