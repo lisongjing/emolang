@@ -8,18 +8,6 @@ pub enum Object {
 }
 
 impl Object {
-    pub fn to_bool(&self) -> bool {
-        match self {
-            Object::Integer(value) => *value > 0 ,
-            Object::Float(value) => *value > 0.0,
-            Object::Boolean(value) => *value,
-            Object::String(value) => !value.is_empty(),
-            Object::Null => false,
-        }
-    }
-}
-
-impl Object {
     pub fn inspect(&self) -> String {
         match self {
             Object::Integer(value) => value.to_string(),

@@ -23,8 +23,28 @@ fn eval_statements(statements: Vec<Node>) -> Result<Object, String> {
 
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
     match operator.as_str() {
-        "⏸️" => Ok(if right.to_bool() { FALSE } else { TRUE }),
+        "⏸️" => eval_prefix_not_expression(&right),
+        "➖" => eval_prefix_minus_expression(&right),
         _ => Err(String::from("Invalid prefix expressions to evaluate values"))
+    }
+}
+
+fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
+    let value = match obj {
+        Object::Integer(value) => *value > 0 ,
+        Object::Float(value) => *value > 0.0,
+        Object::Boolean(value) => *value,
+        Object::String(value) => !value.is_empty(),
+        Object::Null => false,
+    };
+    Ok(if value { FALSE } else { TRUE })
+}
+
+fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
+    match obj {
+        Object::Integer(value) => Ok(Object::Integer(-value)) ,
+        Object::Float(value) => Ok(Object::Float(-value)) ,
+        _ => Err(String::from("Invalid prefix minus expressions to evaluate non-numeric values")),
     }
 }
 
