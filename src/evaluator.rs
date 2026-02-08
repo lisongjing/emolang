@@ -23,13 +23,7 @@ fn eval_statements(statements: Vec<Node>) -> Result<Object, String> {
 
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
     match operator.as_str() {
-        "⏸️" => Ok(match right {
-            Object::Integer(value) => Object::Boolean(value <= 0),
-            Object::Float(value) => Object::Boolean(value <= 0.0),
-            Object::Boolean(value) => Object::Boolean(!value),
-            Object::String(value) => Object::Boolean(!value.is_empty()),
-            Object::Null => Object::Boolean(true),
-        }),
+        "⏸️" => Ok(if right.to_bool() { FALSE } else { TRUE }),
         _ => Err(String::from("Invalid prefix expressions to evaluate values"))
     }
 }
