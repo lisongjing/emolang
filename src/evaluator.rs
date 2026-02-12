@@ -52,6 +52,12 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
 fn eval_infix_expression(operator: String, left: Object, right: Object) -> Result<Object, String> {
     if let Object::Integer(left) = left && let Object::Integer(right) = right {
         eval_integer_infix_expression(operator, left, right)
+    } else if let Object::Integer(left) = left && let Object::Float(right) = right {
+        eval_float_infix_expression(operator, left as f64, right)
+    } else if let Object::Float(left) = left && let Object::Float(right) = right {
+        eval_float_infix_expression(operator, left, right)
+    } else if let Object::Float(left) = left && let Object::Integer(right) = right {
+        eval_float_infix_expression(operator, left, right as f64)
     } else {
         Err(String::from("Invalid infix expression"))
     }
@@ -68,6 +74,17 @@ fn eval_integer_infix_expression(operator: String, left: i64, right: i64) -> Res
     }
 }
 
+fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Result<Object, String> {
+    match operator.as_str() {
+        "➕" => Ok(Object::Float(left + right)),
+        "➖" => Ok(Object::Float(left - right)),
+        "✖️" => Ok(Object::Float(left * right)),
+        "➗" => Ok(Object::Float(left / right)),
+        "〰️" => Ok(Object::Float(left % right)),
+        _ => Err(String::from("Invalid infix expression operator"))
+    }
+}
+
 
 #[cfg(test)]
 mod evaluator_test {
@@ -79,7 +96,7 @@ mod evaluator_test {
     fn test() {
         let source = String::from(
                 "
-        1️⃣ ➕ 9️⃣ ↙️
+        1️⃣⚪3️⃣ ➕ 9️⃣ ↙️
         #️⃣ ⏸️❌↙️",
         );
 
@@ -89,6 +106,6 @@ mod evaluator_test {
         let evaluated = eval(program);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(10));
+        assert_eq!(evaluated.unwrap(), Object::Float(10.3));
     }
 }
