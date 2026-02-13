@@ -38,7 +38,7 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
         Object::String(value) => !value.is_empty(),
         Object::Null => false,
     };
-    Ok(if value { FALSE } else { TRUE })
+    Ok(to_bool_object(!value))
 }
 
 fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
@@ -58,6 +58,10 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Resul
         eval_float_infix_expression(operator, left, right)
     } else if let Object::Float(left) = left && let Object::Integer(right) = right {
         eval_float_infix_expression(operator, left, right as f64)
+    } else if operator == "🟰" {
+        Ok(to_bool_object(left == right))
+    } else if operator == "❗🟰" {
+        Ok(to_bool_object(left != right))
     } else {
         Err(String::from("Invalid infix expression"))
     }
@@ -70,6 +74,12 @@ fn eval_integer_infix_expression(operator: String, left: i64, right: i64) -> Res
         "✖️" => Ok(Object::Integer(left * right)),
         "➗" => Ok(Object::Integer(left / right)),
         "〰️" => Ok(Object::Integer(left % right)),
+        "🟰" => Ok(to_bool_object(left == right)),
+        "❗🟰" => Ok(to_bool_object(left != right)),
+        "▶️" => Ok(to_bool_object(left > right)),
+        "▶️🟰" => Ok(to_bool_object(left >= right)),
+        "◀️" => Ok(to_bool_object(left < right)),
+        "◀️🟰" => Ok(to_bool_object(left <= right)),
         _ => Err(String::from("Invalid infix expression operator"))
     }
 }
@@ -81,8 +91,18 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
         "✖️" => Ok(Object::Float(left * right)),
         "➗" => Ok(Object::Float(left / right)),
         "〰️" => Ok(Object::Float(left % right)),
+        "🟰" => Ok(to_bool_object(left == right)),
+        "❗🟰" => Ok(to_bool_object(left != right)),
+        "▶️" => Ok(to_bool_object(left > right)),
+        "▶️🟰" => Ok(to_bool_object(left >= right)),
+        "◀️" => Ok(to_bool_object(left < right)),
+        "◀️🟰" => Ok(to_bool_object(left <= right)),
         _ => Err(String::from("Invalid infix expression operator"))
     }
+}
+
+fn to_bool_object(value: bool) -> Object {
+    if value { TRUE } else { FALSE }
 }
 
 
@@ -97,7 +117,8 @@ mod evaluator_test {
         let source = String::from(
                 "
         1️⃣⚪3️⃣ ➕ 9️⃣ ↙️
-        #️⃣ ⏸️❌↙️",
+        #️⃣ ⏸️❌↙️
+        1️⃣ ▶️🟰 3️⃣",
         );
 
         let mut lexer = Lexer::new(&source);
@@ -106,6 +127,6 @@ mod evaluator_test {
         let evaluated = eval(program);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Float(10.3));
+        assert_eq!(evaluated.unwrap(), FALSE);
     }
 }
