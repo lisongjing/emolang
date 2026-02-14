@@ -10,6 +10,8 @@ pub fn eval(node: Node) -> Result<Object, String> {
         Node::StringLiteral { token: _, value } => Ok(Object::String(value)),
         Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right)?),
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left)?, eval(*right)?),
+        Node::BlockStatement { token: _, statements } => eval_statements(statements),
+        Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(condition, consequence, alternative),
         _ => Err(String::from("Invalid expressions or statements to evaluate values"))
     }
 }
@@ -101,6 +103,22 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
     }
 }
 
+fn eval_if_expression(condition: Box<Node>, consequence: Box<Node>, alternative: Option<Box<Node>>) -> Result<Object, String> {
+    let condition = match eval(*condition)? {
+        Object::Null => false,
+        Object::Boolean(boolean) => boolean,
+        _ => true,
+    };
+
+    if condition {
+        eval(*consequence)
+    } else if let Some(alternative) = alternative {
+        eval(*alternative)
+    } else {
+        Ok(NULL)
+    }
+}
+
 fn to_bool_object(value: bool) -> Object {
     if value { TRUE } else { FALSE }
 }
@@ -118,7 +136,7 @@ mod evaluator_test {
                 "
         1️⃣⚪3️⃣ ➕ 9️⃣ ↙️
         #️⃣ ⏸️❌↙️
-        1️⃣ ▶️🟰 3️⃣",
+        ❓ 1️⃣ ▶️🟰 3️⃣ 🫸 9️⃣ 🫷 ❗ 🫸 1️⃣ 🫷 ",
         );
 
         let mut lexer = Lexer::new(&source);
@@ -127,6 +145,6 @@ mod evaluator_test {
         let evaluated = eval(program);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), FALSE);
+        assert_eq!(evaluated.unwrap(), Object::Integer(1));
     }
 }
