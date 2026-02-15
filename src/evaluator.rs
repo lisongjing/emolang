@@ -12,6 +12,7 @@ pub fn eval(node: Node) -> Result<Object, String> {
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left)?, eval(*right)?),
         Node::BlockStatement { token: _, statements } => eval_statements(statements),
         Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(condition, consequence, alternative),
+        Node::ReturnStatement { token: _, value } => Ok(Object::ReturnValue(Box::new(eval(*value)?))),
         _ => Err(String::from("Invalid expressions or statements to evaluate values"))
     }
 }
@@ -21,7 +22,11 @@ fn eval_statements(statements: Vec<Node>) -> Result<Object, String> {
     for statement in statements {
         result = eval(statement);
     }
-    result
+    if let Ok(Object::ReturnValue(value)) = result {
+        Ok(*value)
+    } else {
+        result
+    }
 }
 
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
@@ -39,6 +44,8 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
         Object::Boolean(value) => *value,
         Object::String(value) => !value.is_empty(),
         Object::Null => false,
+        // todo return error
+        Object::ReturnValue(value) => false,
     };
     Ok(to_bool_object(!value))
 }

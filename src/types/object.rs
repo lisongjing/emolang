@@ -5,6 +5,7 @@ pub enum Object {
     Boolean(bool),
     String(String),
     Null,
+    ReturnValue(Box<Object>),
 }
 
 impl Object {
@@ -15,6 +16,7 @@ impl Object {
             Object::Boolean(value) => value.to_string(),
             Object::String(value) => value.clone(),
             Object::Null => "null".to_string(),
+            Object::ReturnValue(value) => value.inspect(),
         }
     }
 }
