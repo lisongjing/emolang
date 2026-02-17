@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::{evaluator::eval, lexer::Lexer, parser::Parser};
+use crate::{evaluator::{Environment, eval}, lexer::Lexer, parser::Parser};
 
 pub fn start() {
     loop {
@@ -14,6 +14,7 @@ pub fn start() {
             .expect("Cannot read from console input");
         let mut lexer = Lexer::new(&line);
         let mut parser = Parser::new(&mut lexer);
+        let mut env = Environment::new();
         let program = parser.parse_program();
 
         if !parser.errors().is_empty() {
@@ -21,7 +22,7 @@ pub fn start() {
             continue;
         }
 
-        match eval(program) {
+        match eval(program, &mut env) {
             Ok(evaluated) => println!("{}", evaluated.inspect()),
             Err(error) => println!("Evaluator error:\n\t{error}"),
         }

@@ -1,4 +1,4 @@
-#[derive(PartialEq, PartialOrd, Debug)]
+#[derive(PartialEq, PartialOrd, Debug, Clone)]
 pub enum Object {
     Integer(i64),
     Float(f64),
