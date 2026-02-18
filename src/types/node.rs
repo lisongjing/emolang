@@ -36,7 +36,7 @@ impl Precedence {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum Node {
     Program {
         statements: Vec<Node>,
