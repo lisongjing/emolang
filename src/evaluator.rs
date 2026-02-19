@@ -41,6 +41,13 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             Ok(value)
         },
         Node::Identifier { token: _, value } => eval_identifier(&value, env),
+        Node::FunctionLiteral { token: _, name, parameters, body } => {
+            let function = Object::Function { parameters, body, env: Box::new(env.clone()) };
+            if let Some(name) = name {
+                env.set(name.string(), function.clone());
+            }
+            Ok(function)
+        },
         _ => Err(String::from("Invalid expressions or statements to evaluate values"))
     }
 }
