@@ -1,6 +1,6 @@
 use std::io::{self, Write};
 
-use crate::{evaluator::{Environment, eval}, lexer::Lexer, parser::Parser};
+use crate::{evaluator::eval, lexer::Lexer, parser::Parser, types::Environment};
 
 pub fn start() {
     loop {
