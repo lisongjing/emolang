@@ -1,25 +1,5 @@
-use std::collections::HashMap;
-
 use crate::types::{Node, object::*};
 
-#[derive(PartialEq, Debug, Clone)]
-pub struct Environment {
-    map: HashMap<String, Object>,
-}
-
-impl<'a> Environment {
-    pub fn new() -> Self {
-        Environment { map: HashMap::new() }
-    }
-
-    pub fn set(&mut self, identifier: String, value: Object) {
-        self.map.insert(identifier, value);
-    }
-
-    pub fn get(&self, identifier: &String) -> Option<&Object> {
-        self.map.get(identifier)
-    }
-}
 
 pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
@@ -47,6 +27,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
                 env.set(name.string(), function.clone());
             }
             Ok(function)
+        },
+        Node::CallExpression { token: _, function, arguments } => {
+            let function = eval(*function, env)?;
+            let args = eval_expressions(arguments, env)?;
+            apply_function(function, args)
         },
         _ => Err(String::from("Invalid expressions or statements to evaluate values"))
     }
@@ -179,6 +164,35 @@ fn eval_identifier(value: &String, env: &Environment) -> Result<Object, String> 
         .ok_or_else(|| format!("identifier not found: {value}"))
 }
 
+fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<Object>, String> {
+    let mut args = vec![];
+    for arg in arguments {
+        args.push(eval(arg, env)?);
+    }
+    Ok(args)
+}
+
+fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
+    if let Object::Function { parameters, body, env } = function {
+        let mut env = Environment::new_enclosed(env);
+        for (index, param) in parameters.iter().enumerate() {
+            if let Node::Identifier { token: _, value } = param {
+                env.set(value.clone(), args.get(index).unwrap().clone());
+            } else {
+                return Err(format!("Not a identifier: {}", param.string()))
+            }
+        }
+        let return_val = eval(*body, &mut env)?;
+        if let Object::ReturnValue(value) = return_val {
+            Ok(*value)
+        } else {
+            Ok(return_val)
+        }
+    } else {
+        Err(format!("Not a function: {}", function.inspect()))
+    }
+}
+
 fn to_bool_object(value: bool) -> Object {
     if value { TRUE } else { FALSE }
 }
@@ -196,7 +210,10 @@ mod evaluator_test {
                 "
         1️⃣⚪3️⃣ ➕ 9️⃣ ↙️
         #️⃣ ⏸️❌↙️
-        🅰️ ⬅️ ❓ 1️⃣ ▶️🟰 3️⃣ 🫸 9️⃣ 🫷 ❗ 🫸 1️⃣ 🫷 
+        📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
+          🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
+        🫷
+        🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛 ↙️
         🅰️ ↙️
         ",
         );
@@ -208,6 +225,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(1));
+        assert_eq!(evaluated.unwrap(), Object::Integer(3));
     }
 }
