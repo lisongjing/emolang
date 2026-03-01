@@ -297,7 +297,20 @@ impl Parser {
 
     fn parse_string_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
-        let value = token.literal.clone();
+        let mut value = token.literal.clone();
+
+        if let Some(val) = value.strip_prefix("🗨️") {
+            value = String::from(val);
+        } else {
+            return Err(String::from("Expected 🗨️ at the start of a string literal"));
+        }
+
+        if let Some(val) = value.strip_suffix("💬") {
+            value = String::from(val);
+        } else {
+            return Err(String::from("Expected 💬 at the end of a string literal"));
+        }
+        
         Ok(Node::StringLiteral { token, value })
     }
 
@@ -509,6 +522,7 @@ mod parser_test {
         🫷
         ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛 ↙️
         🈯 🌜🅰️🦶 🅱️🌛
+        🗨️🈶🅰️🈚🅱️🈲🆎
             ",
         );
         let target_statements = [
@@ -520,6 +534,7 @@ mod parser_test {
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",
+            "Expected 💬 at the end of a string literal",
         ];
 
         let mut lexer = Lexer::new(&source);

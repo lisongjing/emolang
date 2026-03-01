@@ -1,7 +1,7 @@
 use unicode_segmentation::UnicodeSegmentation;
 
-use crate::util::StatefulVector;
 use crate::types::token::*;
+use crate::util::StatefulVector;
 
 pub struct Lexer<'a> {
     chars: StatefulVector<&'a str>,
@@ -22,7 +22,10 @@ impl<'a> Lexer<'a> {
 
         while let Some(char) = self.chars.to_next() {
             let token = match *char {
-                "#️⃣" => { self.skip_comment(); continue; },
+                "#️⃣" => {
+                    self.skip_comment();
+                    continue;
+                }
                 "⬅️" => Token::from_str(TokenType::Assign, char),
                 "➕" => Token::from_str(TokenType::Plus, char),
                 "➖" => Token::from_str(TokenType::Minus, char),
@@ -87,8 +90,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_string(&mut self) -> Token {
-        let mut literal = String::new();
+        let mut literal = String::from(*self.chars.current().unwrap());
         while self.chars.to_next().is_some_and(|&char| char != "💬") {
+            literal.push_str(self.chars.current().unwrap());
+        }
+        if self.chars.current().is_some() {
             literal.push_str(self.chars.current().unwrap());
         }
         Token::from(TokenType::String, literal)
@@ -125,7 +131,11 @@ impl<'a> Lexer<'a> {
     }
 
     fn skip_comment(&mut self) {
-        while self.chars.to_next().is_some_and(|&char| !NEWLINE.contains(&char)) {}
+        while self
+            .chars
+            .to_next()
+            .is_some_and(|&char| !NEWLINE.contains(&char))
+        {}
     }
 }
 
@@ -168,7 +178,7 @@ mod lexer_test {
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::Identifier, "㊙️🔡"),
             Token::from_str(TokenType::Assign, "⬅️"),
-            Token::from_str(TokenType::String, "🈶🅰️🈚🅱️🈲🆎"),
+            Token::from_str(TokenType::String, "🗨️🈶🅰️🈚🅱️🈲🆎💬"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::Function, "📛"),
             Token::from_str(TokenType::Identifier, "🈯"),
