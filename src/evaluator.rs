@@ -99,6 +99,8 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Resul
         eval_float_infix_expression(operator, left, right)
     } else if let Object::Float(left) = left && let Object::Integer(right) = right {
         eval_float_infix_expression(operator, left, right as f64)
+    } else if let Object::String(ref left) = left && let Object::String(ref right) = right {
+        eval_string_infix_expression(operator, left, right)
     } else if operator == "🟰" {
         Ok(to_bool_object(left == right))
     } else if operator == "❗🟰" {
@@ -138,6 +140,19 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
         "▶️🟰" => Ok(to_bool_object(left >= right)),
         "◀️" => Ok(to_bool_object(left < right)),
         "◀️🟰" => Ok(to_bool_object(left <= right)),
+        _ => Err(String::from("Invalid infix expression operator"))
+    }
+}
+
+fn eval_string_infix_expression(operator: String, left: &str, right: &str) -> Result<Object, String> {
+    match operator.as_str() {
+        "➕" => {
+            let mut join = String::from(left);
+            join.push_str(right);
+            Ok(Object::String(join))
+        },
+        "🟰" => Ok(to_bool_object(left == right)),
+        "❗🟰" => Ok(to_bool_object(left != right)),
         _ => Err(String::from("Invalid infix expression operator"))
     }
 }
@@ -215,6 +230,7 @@ mod evaluator_test {
         🫷
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛 ↙️
         🅰️ ↙️
+        🗨️🈶🅰️🈚🅱️💬 ➕ 🗨️🈲🆎💬 ↙️
         ",
         );
 
@@ -225,6 +241,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(3));
+        assert_eq!(evaluated.unwrap(), Object::String(String::from("🈶🅰️🈚🅱️🈲🆎")));
     }
 }
