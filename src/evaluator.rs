@@ -12,7 +12,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right, env)?),
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::BlockStatement { token: _, statements } => eval_block_statements(statements, env),
-        Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(condition, consequence, alternative, env),
+        Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(*condition, *consequence, alternative, env),
         Node::ReturnStatement { token: _, value } => Ok(Object::ReturnValue(Box::new(eval(*value, env)?))),
         Node::AssignStatement { token: _, name, value } => {
             let value = eval(*value, env)?;
@@ -142,15 +142,15 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
     }
 }
 
-fn eval_if_expression(condition: Box<Node>, consequence: Box<Node>, alternative: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
-    let condition = match eval(*condition, env)? {
+fn eval_if_expression(condition: Node, consequence: Node, alternative: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
+    let condition = match eval(condition, env)? {
         Object::Null => false,
         Object::Boolean(boolean) => boolean,
         _ => true,
     };
 
     if condition {
-        eval(*consequence, env)
+        eval(consequence, env)
     } else if let Some(alternative) = alternative {
         eval(*alternative, env)
     } else {
@@ -160,7 +160,7 @@ fn eval_if_expression(condition: Box<Node>, consequence: Box<Node>, alternative:
 
 fn eval_identifier(value: &String, env: &Environment) -> Result<Object, String> {
     env.get(value)
-        .map(|obj| obj.clone())
+        .cloned()
         .ok_or_else(|| format!("identifier not found: {value}"))
 }
 
