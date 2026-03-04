@@ -19,6 +19,7 @@ impl<'a> Lexer<'a> {
         let start_token = Token::start();
         tokens.push(start_token);
         self.chars.insert(0, " ");
+        self.chars.push("\n");
 
         while let Some(char) = self.chars.to_next() {
             let token = match *char {
@@ -63,6 +64,13 @@ impl<'a> Lexer<'a> {
                 "🫷" => Token::from_str(TokenType::RBrace, char),
                 "🗨️" => self.handle_string(),
                 _ if DIGITALS.contains(char) => self.handle_number(),
+                _ if NEWLINES.contains(char) => {
+                    if let Some(token) = self.handle_new_line(&tokens) {
+                        token
+                    } else {
+                        continue
+                    }
+                }
                 _ if SPACES.contains(char) => continue,
                 _ if is_identifier_char(char) => self.handle_identifier(),
                 _ => Token::from_str(TokenType::Illegal, char),
@@ -130,12 +138,21 @@ impl<'a> Lexer<'a> {
         Token::from(TokenType::Identifier, literal)
     }
 
+    fn handle_new_line(&self, tokens: &StatefulVector<Token>) -> Option<Token> {
+        if tokens.last().is_some_and(|token| ![TokenType::Semicolon, TokenType::Start, TokenType::LBrace, TokenType::RBrace].contains(&token.token_type)) {
+            Some(Token::from_str(TokenType::Semicolon, self.chars.current().unwrap()))
+        } else {
+            None
+        }
+    }
+
     fn skip_comment(&mut self) {
         while self
             .chars
-            .to_next()
-            .is_some_and(|&char| !NEWLINE.contains(&char))
-        {}
+            .is_next_match(|&char| !NEWLINES.contains(&char))
+        {
+            self.chars.to_next();
+        }
     }
 }
 
@@ -144,6 +161,7 @@ fn is_identifier_char(char: &str) -> bool {
         && !DIGITALS.contains(&char)
         && !DOTS.contains(&char)
         && !SPACES.contains(&char)
+        && !NEWLINES.contains(&char)
 }
 
 #[cfg(test)]
@@ -154,7 +172,7 @@ mod lexer_test {
     fn test() {
         let source = String::from(
             "
-        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️ #️⃣test assign statement
+        ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ #️⃣test assign statement
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
@@ -175,7 +193,7 @@ mod lexer_test {
             Token::from_str(TokenType::Float, "3.9"),
             Token::from_str(TokenType::Multiply, "✖️"),
             Token::from_str(TokenType::Integer, "72"),
-            Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::Identifier, "㊙️🔡"),
             Token::from_str(TokenType::Assign, "⬅️"),
             Token::from_str(TokenType::String, "🗨️🈶🅰️🈚🅱️🈲🆎💬"),
@@ -232,6 +250,7 @@ mod lexer_test {
             Token::from_str(TokenType::LessThan, "◀️"),
             Token::from_str(TokenType::Integer, "1"),
             Token::from_str(TokenType::RParenthesis, "🌛"),
+            Token::from_str(TokenType::Semicolon, "\n"),
         ];
         let mut lexer = Lexer::new(&source);
         assert_eq!(lexer.tokenize().to_vec(), target);

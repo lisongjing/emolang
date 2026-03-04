@@ -53,8 +53,8 @@ pub const RESERVED_SYMBOLS: [&str; 31] = [
 ];
 pub const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 pub const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
-pub const SPACES: [&str; 5] = [" ", "\t", NEWLINE[0], NEWLINE[1], NEWLINE[2]];
-pub const NEWLINE: [&str; 3] = ["\r", "\n", "\r\n"];
+pub const SPACES: [&str; 2] = [" ", "\t"];
+pub const NEWLINES: [&str; 3] = ["\r", "\n", "\r\n"];
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {
