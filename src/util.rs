@@ -100,7 +100,11 @@ impl<T: PartialEq> StatefulVector<T> {
     }
 
     pub fn has_previous(&self) -> bool {
-        self.is_pos_valid(self.position - 1)
+        if self.position == 0 {
+            false
+        } else {
+            self.is_pos_valid(self.position - 1)
+        }
     }
 
     pub fn iter(&self) -> std::slice::Iter<'_, T> {
