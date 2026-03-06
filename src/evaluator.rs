@@ -99,6 +99,8 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Resul
         eval_float_infix_expression(operator, left, right)
     } else if let Object::Float(left) = left && let Object::Integer(right) = right {
         eval_float_infix_expression(operator, left, right as f64)
+    } else if let Object::Boolean(left) = left && let Object::Boolean(right) = right {
+        eval_boolean_infix_expression(operator, left, right)
     } else if let Object::String(ref left) = left && let Object::String(ref right) = right {
         eval_string_infix_expression(operator, left, right)
     } else if operator == "🟰" {
@@ -106,7 +108,7 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Resul
     } else if operator == "❗🟰" {
         Ok(to_bool_object(left != right))
     } else {
-        Err(String::from("Invalid infix expression"))
+        Err(format!("Invalid infix expression: {:?} {} {:?}", left, operator, right))
     }
 }
 
@@ -140,6 +142,16 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
         "▶️🟰" => Ok(to_bool_object(left >= right)),
         "◀️" => Ok(to_bool_object(left < right)),
         "◀️🟰" => Ok(to_bool_object(left <= right)),
+        _ => Err(String::from("Invalid infix expression operator"))
+    }
+}
+
+fn eval_boolean_infix_expression(operator: String, left: bool, right: bool) -> Result<Object, String> {
+    match operator.as_str() {
+        "🟰" => Ok(to_bool_object(left == right)),
+        "❗🟰" => Ok(to_bool_object(left != right)),
+        "🔁" => Ok(to_bool_object(left && right)),
+        "🔀" => Ok(to_bool_object(left || right)),
         _ => Err(String::from("Invalid infix expression operator"))
     }
 }
