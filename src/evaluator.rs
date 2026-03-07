@@ -13,6 +13,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::BlockStatement { token: _, statements } => eval_block_statements(statements, env),
         Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(*condition, *consequence, alternative, env),
+        Node::WhileExpression { token: _, condition, body } => eval_while_expression(*condition, *body, env),
         Node::ReturnStatement { token: _, value } => Ok(Object::ReturnValue(Box::new(eval(*value, env)?))),
         Node::AssignStatement { token: _, name, value } => {
             let value = eval(*value, env)?;
@@ -33,7 +34,6 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             let args = eval_expressions(arguments, env)?;
             apply_function(function, args)
         },
-        _ => Err(String::from("Invalid expressions or statements to evaluate values"))
     }
 }
 
@@ -170,19 +170,28 @@ fn eval_string_infix_expression(operator: String, left: &str, right: &str) -> Re
 }
 
 fn eval_if_expression(condition: Node, consequence: Node, alternative: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
-    let condition = match eval(condition, env)? {
-        Object::Null => false,
-        Object::Boolean(boolean) => boolean,
-        _ => true,
-    };
-
-    if condition {
+    if eval_condition(condition, env)? {
         eval(consequence, env)
     } else if let Some(alternative) = alternative {
         eval(*alternative, env)
     } else {
         Ok(NULL)
     }
+}
+
+fn eval_while_expression(condition: Node, body: Node, env: &mut Environment) -> Result<Object, String> {
+    while eval_condition(condition.clone(), env)? {
+        eval(body.clone(), env)?;
+    }
+    Ok(NULL)
+}
+
+fn eval_condition(condition: Node, env: &mut Environment) -> Result<bool, String> {
+    Ok(match eval(condition, env)? {
+        Object::Null => false,
+        Object::Boolean(boolean) => boolean,
+        _ => true,
+    })
 }
 
 fn eval_identifier(value: &String, env: &Environment) -> Result<Object, String> {
@@ -238,11 +247,15 @@ mod evaluator_test {
         1️⃣⚪3️⃣ ➕ 9️⃣
         #️⃣ ⏸️❌
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
+          ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
+            🅰️ ⬅️ 🅰️ ➖ 1️⃣
+            🅱️ ⬅️ 🅱️ ➕ 1️⃣
+          🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷
         🫷
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛
         🅰️
-        🗨️🈶🅰️🈚🅱️💬 ➕ 🗨️🈲🆎💬
+        #️⃣ 🗨️🈶🅰️🈚🅱️💬 ➕ 🗨️🈲🆎💬
         ",
         );
 
@@ -253,6 +266,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::String(String::from("🈶🅰️🈚🅱️🈲🆎")));
+        assert_eq!(evaluated.unwrap(), Object::Integer(5));
     }
 }
