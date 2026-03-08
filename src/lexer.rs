@@ -62,7 +62,7 @@ impl<'a> Lexer<'a> {
                 "👈" => Token::from_str(TokenType::RBracket, char),
                 "🫸" => Token::from_str(TokenType::LBrace, char),
                 "🫷" => Token::from_str(TokenType::RBrace, char),
-                "🗨️" => self.handle_string(),
+                _ if QUOTES.contains(char) => self.handle_string(),
                 _ if DIGITALS.contains(char) => self.handle_number(),
                 _ if NEWLINES.contains(char) => {
                     if let Some(token) = self.handle_new_line(&tokens) {
@@ -99,10 +99,10 @@ impl<'a> Lexer<'a> {
 
     fn handle_string(&mut self) -> Token {
         let mut literal = String::from(*self.chars.current().unwrap());
-        while self.chars.to_next().is_some_and(|&char| char != "💬") {
-            literal.push_str(self.chars.current().unwrap());
+        while self.chars.is_next_match(|char| !QUOTES.contains(char) || *self.chars.current().unwrap() == "🪄") {
+            literal.push_str(self.chars.to_next().unwrap());
         }
-        if self.chars.current().is_some() {
+        if self.chars.to_next().is_some() {
             literal.push_str(self.chars.current().unwrap());
         }
         Token::from(TokenType::String, literal)
@@ -162,6 +162,7 @@ fn is_identifier_char(char: &str) -> bool {
         && !DOTS.contains(&char)
         && !SPACES.contains(&char)
         && !NEWLINES.contains(&char)
+        && !QUOTES.contains(&char)
 }
 
 #[cfg(test)]

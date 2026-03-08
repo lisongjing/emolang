@@ -47,14 +47,15 @@ pub enum TokenType {
     String,
 }
 
-pub const RESERVED_SYMBOLS: [&str; 31] = [
+pub const RESERVED_SYMBOLS: [&str; 30] = [
     "⬅️", "➕", "➖", "✖️", "➗", "〰️", "🟰", "▶️", "◀️", "🔁", "🔀", "⏸️", "↙️", "🦶", "🌜", "🌛",
-    "👉", "👈", "🫸", "🫷", "🗨️", "💬", "✔️", "❌", "❓", "❗", "⁉️", "⭕", "📛", "🔙", "#️⃣",
+    "👉", "👈", "🫸", "🫷", "🪄", "✔️", "❌", "❓", "❗", "⁉️", "⭕", "📛", "🔙", "#️⃣",
 ];
 pub const DIGITALS: [&str; 10] = ["0️⃣", "1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣"];
 pub const DOTS: [&str; 9] = ["⚪", "⚫", "🟤", "🟣", "🔵", "🟢", "🟡", "🟠", "🔴"];
 pub const SPACES: [&str; 2] = [" ", "\t"];
 pub const NEWLINES: [&str; 3] = ["\r", "\n", "\r\n"];
+pub const QUOTES: [&str; 2] = ["🗨️", "💬"];
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Token {

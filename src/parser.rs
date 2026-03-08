@@ -5,9 +5,7 @@ use std::{
 };
 
 use crate::{
-    types::{node::*, Token, TokenType},
-    lexer::Lexer,
-    util::StatefulVector,
+    lexer::Lexer, types::{QUOTES, Token, TokenType, node::*}, util::StatefulVector
 };
 
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Node, String>>;
@@ -299,16 +297,24 @@ impl Parser {
         let token = self.tokens.current().unwrap().clone();
         let mut value = token.literal.clone();
 
-        if let Some(val) = value.strip_prefix("🗨️") {
-            value = String::from(val);
-        } else {
-            return Err(String::from("Expected 🗨️ at the start of a string literal"));
-        }
+        let mut has_prefix = false;
+        let mut has_suffix = false;
 
-        if let Some(val) = value.strip_suffix("💬") {
-            value = String::from(val);
-        } else {
-            return Err(String::from("Expected 💬 at the end of a string literal"));
+        for quote in QUOTES {
+            if !has_prefix && let Some(val) = value.strip_prefix(quote) {
+                value = String::from(val);
+                has_prefix = true;
+            }
+            if !has_suffix && let Some(val) = value.strip_suffix(quote) {
+                value = String::from(val);
+                has_suffix = true;
+            }
+        }
+        if !has_prefix {
+            return Err(String::from("Expected 🗨️ or 💬 at the start of a string literal"));
+        }
+        if !has_suffix {
+            return Err(String::from("Expected 🗨️ or 💬 at the end of a string literal"));
         }
         
         Ok(Node::StringLiteral { token, value })
@@ -534,7 +540,7 @@ mod parser_test {
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",
-            "Expected 💬 at the end of a string literal",
+            "Expected 🗨️ or 💬 at the end of a string literal",
         ];
 
         let mut lexer = Lexer::new(&source);
