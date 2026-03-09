@@ -295,7 +295,13 @@ impl Parser {
 
     fn parse_string_literal(&self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
-        let mut value = token.literal.clone();
+        let mut value = token
+            .literal
+            .clone()
+            .replace("🪄↩️", "\n")
+            .replace("🪄➡️", "\t")
+            .replace("🪄🗨️", "🗨️")
+            .replace("🪄💬", "💬");
 
         let mut has_prefix = false;
         let mut has_suffix = false;
@@ -518,7 +524,7 @@ mod parser_test {
         let source = String::from(
                 "
         ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
-        ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️
+        ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎🪄↩️💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
             🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
@@ -533,7 +539,7 @@ mod parser_test {
         );
         let target_statements = [
             "㊙️🔢 ⬅️ 🌜1️⃣ ➕ 🌜3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣🌛🌛 ↙️",
-            "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎💬 ↙️",
+            "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎\n💬 ↙️",
             "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
             "🈯🌜🅰️🦶 🅱️🌛 ↙️"
