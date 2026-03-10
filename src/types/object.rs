@@ -26,7 +26,7 @@ impl Object {
             Object::String(value) => value.clone(),
             Object::Null => "null".to_string(),
             Object::ReturnValue(value) => value.inspect(),
-            Object::Function { parameters, body, env: _ } => format!("fn({}){}", parameters.iter().map(|node| node.string()).collect::<String>(), body.string()),
+            Object::Function { parameters, body, env: _ } => format!("fn({}) {}", parameters.iter().map(|node| node.string()).collect::<Vec<String>>().join(", "), body.string()),
         }
     }
 }
