@@ -210,6 +210,9 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
     if let Object::Function { parameters, body, env } = function {
+        if parameters.len() != args.len() {
+            return Err(format!("Expected {} arguments, but got {}", parameters.len(), args.len()))
+        }
         let mut env = Environment::new_enclosed(env);
         for (index, param) in parameters.iter().enumerate() {
             if let Node::Identifier { token: _, value } = param {
