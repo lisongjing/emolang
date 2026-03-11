@@ -3,6 +3,7 @@ use std::io::{self, Write};
 use crate::{evaluator::eval, lexer::Lexer, parser::Parser, types::Environment};
 
 pub fn start() {
+    let mut env = Environment::new();
     loop {
         print!(">> ");
         io::stdout()
@@ -14,7 +15,6 @@ pub fn start() {
             .expect("Cannot read from console input");
         let mut lexer = Lexer::new(&line);
         let mut parser = Parser::new(&mut lexer);
-        let mut env = Environment::new();
         let program = parser.parse_program();
 
         if !parser.errors().is_empty() {
