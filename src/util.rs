@@ -123,3 +123,49 @@ impl<T: PartialEq> StatefulVector<T> {
         }
     }
 }
+
+pub mod emoji_convert {
+
+    const DOT: char = '.';
+    const NULL_EMOJI: &str = "🈳";
+    const DOT_EMOJI: &str = "\u{26aa}";
+    const DIGITAL_EMOJI_SUFFIX: &str = "\u{fe0f}\u{20e3}";
+
+    pub fn digital_emoji_to_char(emoji_char: &str) -> char {
+        emoji_char.chars().next().unwrap()
+    }
+
+    pub fn dot_char() -> char {
+        DOT
+    }
+
+    pub fn null_emoji() -> String {
+        String::from(NULL_EMOJI)
+    }
+
+    pub fn integer_to_emoji(integer: &i64) -> String {
+        integer
+            .to_string()
+            .chars()
+            .map(|char| format!("{char}{DIGITAL_EMOJI_SUFFIX}"))
+            .collect()
+    }
+
+    pub fn float_to_emoji(float: &f64) -> String {
+        float
+            .to_string()
+            .chars()
+            .map(|char| {
+                if char == '.' {
+                    DOT_EMOJI.to_string()
+                } else {
+                    format!("{char}{DIGITAL_EMOJI_SUFFIX}")
+                }
+            })
+            .collect()
+    }
+
+    pub fn boolean_to_emoji(boolean: &bool) -> String {
+        String::from(if *boolean { "✔️" } else { "❌" })
+    }
+}

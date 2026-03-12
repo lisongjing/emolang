@@ -2,6 +2,7 @@ use unicode_segmentation::UnicodeSegmentation;
 
 use crate::types::token::*;
 use crate::util::StatefulVector;
+use crate::util::emoji_convert::{digital_emoji_to_char, dot_char};
 
 pub struct Lexer<'a> {
     chars: StatefulVector<&'a str>,
@@ -118,11 +119,11 @@ impl<'a> Lexer<'a> {
 
             if is_digital {
                 let next_char = self.chars.to_next().unwrap();
-                literal.push(next_char.chars().next().unwrap());
+                literal.push(digital_emoji_to_char(next_char));
             } else if is_dot {
                 self.chars.to_next().unwrap();
                 token_type = TokenType::Float;
-                literal.push('.');
+                literal.push(dot_char());
             } else {
                 break;
             }

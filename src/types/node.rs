@@ -1,4 +1,4 @@
-use crate::types::{Token, TokenType};
+use crate::{types::{Token, TokenType}, util::emoji_convert::{float_to_emoji, integer_to_emoji}};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
@@ -188,22 +188,8 @@ impl Node {
                     .collect::<String>()
             ),
             Node::Identifier { token: _, value } => value.clone(),
-            Node::IntegerLiteral { token: _, value } => value
-                .to_string()
-                .chars()
-                .map(|digital| format!("{digital}\u{fe0f}\u{20e3}"))
-                .collect(),
-            Node::FloatLiteral { token: _, value } => value
-                .to_string()
-                .chars()
-                .map(|char| {
-                    if char == '.' {
-                        "\u{26aa}".to_string()
-                    } else {
-                        format!("{char}\u{fe0f}\u{20e3}")
-                    }
-                })
-                .collect(),
+            Node::IntegerLiteral { token: _, value } => integer_to_emoji(value),
+            Node::FloatLiteral { token: _, value } => float_to_emoji(value),
             Node::BooleanLiteral { token, value: _ } => token.literal.clone(),
             Node::StringLiteral { token: _, value } => format!("🗨️{}💬", value),
             Node::PrefixExpression {
