@@ -209,26 +209,30 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
 }
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
-    if let Object::Function { parameters, body, env } = function {
-        if parameters.len() != args.len() {
-            return Err(format!("Expected {} arguments, but got {}", parameters.len(), args.len()))
-        }
-        let mut env = Environment::new_enclosed(env);
-        for (index, param) in parameters.iter().enumerate() {
-            if let Node::Identifier { token: _, value } = param {
-                env.set(value.clone(), args.get(index).unwrap().clone());
-            } else {
-                return Err(format!("Not a identifier: {}", param.string()))
+    match function {
+        Object::Function { parameters, body, env } => {
+            if parameters.len() != args.len() {
+                return Err(format!("Expected {} argument(s), but got {}", parameters.len(), args.len()))
             }
-        }
-        let return_val = eval(*body, &mut env)?;
-        if let Object::ReturnValue(value) = return_val {
-            Ok(*value)
-        } else {
-            Ok(return_val)
-        }
-    } else {
-        Err(format!("Not a function: {}", function.inspect()))
+            let mut env = Environment::new_enclosed(env);
+            for (index, param) in parameters.iter().enumerate() {
+                if let Node::Identifier { token: _, value } = param {
+                    env.set(value.clone(), args.get(index).unwrap().clone());
+                } else {
+                    return Err(format!("Not a identifier: {}", param.string()))
+                }
+            }
+            let return_val = eval(*body, &mut env)?;
+            if let Object::ReturnValue(value) = return_val {
+                Ok(*value)
+            } else {
+                Ok(return_val)
+            }
+        },
+        Object::BuiltinFunction(function) => {
+            function.call(&args)
+        },
+        _ => Err(format!("Not a function: {}", function.inspect())),
     }
 }
 
@@ -257,8 +261,7 @@ mod evaluator_test {
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷
         🫷
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛
-        🅰️
-        #️⃣ 🗨️🈶🅰️🈚🅱️💬 ➕ 🗨️🈲🆎💬
+        🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️🌛
         ",
         );
 
@@ -269,6 +272,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(5));
+        assert_eq!(evaluated.unwrap(), Object::String("🅰️ 🟰 5️⃣".to_string()));
     }
 }
