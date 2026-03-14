@@ -5,7 +5,9 @@ use std::{
 };
 
 use crate::{
-    lexer::Lexer, types::{QUOTES, Token, TokenType, node::*}, util::StatefulVector
+    lexer::Lexer,
+    types::{QUOTES, Token, TokenType, node::*},
+    util::StatefulVector,
 };
 
 type PrefixParser = Rc<dyn Fn(&mut Parser) -> Result<Node, String>>;
@@ -49,6 +51,8 @@ impl Parser {
             .insert(TokenType::False, Rc::new(|p| p.parse_bool_literal()));
         self.prefix_exp_parsers
             .insert(TokenType::String, Rc::new(|p| p.parse_string_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::LBracket, Rc::new(|p| p.parse_list_expression()));
 
         self.prefix_exp_parsers
             .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
@@ -322,8 +326,37 @@ impl Parser {
         if !has_suffix {
             return Err(String::from("Expected 🗨️ or 💬 at the end of a string literal"));
         }
-        
+
         Ok(Node::StringLiteral { token, value })
+    }
+
+    fn parse_list_expression(&mut self) -> Result<Node, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let mut elements = vec![];
+        while self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RBracket)
+            .is_some()
+        {
+            elements.push(self.parse_expression(Precedence::Lowest)?);
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RBracket)
+            {
+                continue;
+            }
+
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
+                return Err(format!("Expected a comma, but got a {}", token.literal));
+            }
+        }
+        Ok(Node::ListLiteral { token, elements })
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Node, String> {
@@ -341,10 +374,7 @@ impl Parser {
         }
     }
 
-    fn parse_infix_expression(
-        &mut self,
-        left: Node,
-    ) -> Result<Node, String> {
+    fn parse_infix_expression(&mut self, left: Node) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
         let precedence = Precedence::get_operator_precedence(self.tokens.current().unwrap());
@@ -484,14 +514,10 @@ impl Parser {
             name,
             parameters,
             body,
-            
         })
     }
 
-    fn parse_call_expression(
-        &mut self,
-        function: Node,
-    ) -> Result<Node, String> {
+    fn parse_call_expression(&mut self, function: Node) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut arguments = vec![];
 
@@ -522,7 +548,7 @@ mod parser_test {
     #[test]
     fn test() {
         let source = String::from(
-                "
+            "
         ㊙️🔢 ⬅️ 1️⃣ ➕  3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣ ↙️
         ㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎🪄↩️💬 ↙️
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
@@ -534,6 +560,7 @@ mod parser_test {
         🫷
         ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛 ↙️
         🈯 🌜🅰️🦶 🅱️🌛
+        👉🅰️🦶 🅱️👈
         🗨️🈶🅰️🈚🅱️🈲🆎
             ",
         );
@@ -542,7 +569,8 @@ mod parser_test {
             "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎\n💬 ↙️",
             "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
-            "🈯🌜🅰️🦶 🅱️🌛 ↙️"
+            "🈯🌜🅰️🦶 🅱️🌛 ↙️",
+            "👉🅰️🦶 🅱️👈 ↙️"
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",

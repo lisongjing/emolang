@@ -1,4 +1,7 @@
-use crate::{types::{Token, TokenType}, util::emoji_convert::{float_to_emoji, integer_to_emoji}};
+use crate::{
+    types::{Token, TokenType},
+    util::emoji_convert::{float_to_emoji, integer_to_emoji},
+};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
@@ -12,7 +15,6 @@ pub enum Precedence {
     Prefix,      // ➖x/⏸️x
     Call,        // fn🌜🌛
 }
-
 
 impl Precedence {
     pub fn get_operator_precedence(token: &Token) -> Precedence {
@@ -31,7 +33,7 @@ impl Precedence {
             TokenType::Divide => Precedence::Product,
             TokenType::Modulo => Precedence::Product,
             TokenType::LParenthesis => Precedence::Call,
-            _ => Precedence::Lowest
+            _ => Precedence::Lowest,
         }
     }
 }
@@ -79,6 +81,10 @@ pub enum Node {
     StringLiteral {
         token: Token,
         value: String,
+    },
+    ListLiteral {
+        token: Token,
+        elements: Vec<Node>,
     },
     PrefixExpression {
         token: Token,
@@ -131,6 +137,7 @@ impl Node {
             Node::FloatLiteral { token, value: _ } => &token.literal,
             Node::BooleanLiteral { token, value: _ } => &token.literal,
             Node::StringLiteral { token, value: _ } => &token.literal,
+            Node::ListLiteral { token, elements: _ } => &token.literal,
             Node::PrefixExpression {
                 token,
                 operator: _,
@@ -192,6 +199,14 @@ impl Node {
             Node::FloatLiteral { token: _, value } => float_to_emoji(value),
             Node::BooleanLiteral { token, value: _ } => token.literal.clone(),
             Node::StringLiteral { token: _, value } => format!("🗨️{}💬", value),
+            Node::ListLiteral { token: _, elements } => format!(
+                "👉{}👈",
+                elements
+                    .iter()
+                    .map(|exp| exp.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 ")
+            ),
             Node::PrefixExpression {
                 token: _,
                 operator,
