@@ -9,6 +9,7 @@ pub enum Object {
     Boolean(bool),
     String(String),
     Null,
+    List(Vec<Object>),
     ReturnValue(Box<Object>),
     Function {
         parameters: Vec<Node>,
@@ -26,6 +27,7 @@ impl Object {
             Object::Boolean(value) => value.to_string(),
             Object::String(value) => value.clone(),
             Object::Null => "null".to_string(),
+            Object::List(value) => format!("[{}]", value.iter().map(|obj| obj.inspect()).collect::<Vec<String>>().join(", ")),
             Object::ReturnValue(value) => value.inspect(),
             Object::Function { parameters, body, env: _ } => format!("fn({}) {}", parameters.iter().map(|node| node.string()).collect::<Vec<String>>().join(", "), body.string()),
             Object::BuiltinFunction(function) => format!("{}(args...){{ //builtin implementation }}", function.name()),

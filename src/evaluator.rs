@@ -9,6 +9,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::FloatLiteral { token: _, value } => Ok(Object::Float(value)),
         Node::BooleanLiteral { token: _, value } => Ok(Object::Boolean(value)),
         Node::StringLiteral { token: _, value } => Ok(Object::String(value)),
+        Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
         Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right, env)?),
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::BlockStatement { token: _, statements } => eval_block_statements(statements, env),
@@ -59,6 +60,14 @@ fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result
     result
 }
 
+fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Object, String> {
+    let mut value = vec![];
+    for node in elements {
+        value.push(eval(node, env)?);
+    }
+    Ok(Object::List(value))
+}
+
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
     match operator.as_str() {
         "⏸️" => eval_prefix_not_expression(&right),
@@ -77,6 +86,7 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
         Object::Boolean(value) => *value,
         Object::String(value) => !value.is_empty(),
         Object::Null => false,
+        Object::List(value) => !value.is_empty(),
         _ => false,
     };
     Ok(to_bool_object(!value))
@@ -103,6 +113,8 @@ fn eval_infix_expression(operator: String, left: Object, right: Object) -> Resul
         eval_boolean_infix_expression(operator, left, right)
     } else if let Object::String(ref left) = left && let Object::String(ref right) = right {
         eval_string_infix_expression(operator, left, right)
+    } else if let Object::List(ref left) = left && let Object::List(ref right) = right {
+        eval_list_infix_expression(operator, left, right)
     } else if operator == "🟰" {
         Ok(to_bool_object(left == right))
     } else if operator == "❗🟰" {
@@ -166,6 +178,23 @@ fn eval_string_infix_expression(operator: String, left: &str, right: &str) -> Re
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
         _ => Err(String::from("Invalid infix expression operator"))
+    }
+}
+
+fn eval_list_infix_expression(operator: String, left: &Vec<Object>, right: &Vec<Object>) -> Result<Object, String> {
+    match operator.as_str() {
+        "➕" => {
+            let mut union = left.clone();
+            union.extend_from_slice(right);
+            Ok(Object::List(union))
+        },
+        "➖" => {
+            let difference = left.clone().into_iter().filter(|x| !right.contains(x)).collect::<Vec<Object>>();
+            Ok(Object::List(difference))
+        },
+        "🟰" => Ok(to_bool_object(left == right)),
+        "❗🟰" => Ok(to_bool_object(left != right)),
+        _ => Err(String::from("Invalid infix expression operator")),
     }
 }
 
