@@ -14,6 +14,7 @@ pub enum Precedence {
     Product,     // ✖️/➗/〰️
     Prefix,      // ➖x/⏸️x
     Call,        // fn🌜🌛
+    Index,       // list👉 👈
 }
 
 impl Precedence {
@@ -33,6 +34,7 @@ impl Precedence {
             TokenType::Divide => Precedence::Product,
             TokenType::Modulo => Precedence::Product,
             TokenType::LParenthesis => Precedence::Call,
+            TokenType::LBracket => Precedence::Index,
             _ => Precedence::Lowest,
         }
     }
@@ -97,6 +99,11 @@ pub enum Node {
         operator: String,
         right: Box<Node>,
     },
+    IndexExpression {
+        token: Token,
+        left: Box<Node>,
+        index: Box<Node>,
+    },
     IfExpression {
         token: Token,
         condition: Box<Node>,
@@ -148,6 +155,11 @@ impl Node {
                 left: _,
                 operator: _,
                 right: _,
+            } => &token.literal,
+            Node::IndexExpression {
+                token,
+                left: _,
+                index: _
             } => &token.literal,
             Node::IfExpression {
                 token,
@@ -218,6 +230,11 @@ impl Node {
                 operator,
                 right,
             } => format!("🌜{} {} {}🌛", left.string(), operator, right.string()),
+            Node::IndexExpression {
+                token: _,
+                left,
+                index
+            } => format!("{}👉{}👈", left.string(), index.string()),
             Node::IfExpression {
                 token,
                 condition,

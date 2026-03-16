@@ -125,6 +125,10 @@ impl Parser {
         );
 
         self.infix_exp_parsers.insert(
+            TokenType::LBracket,
+            Rc::new(|p, left| p.parse_index_expression(left))
+        );
+        self.infix_exp_parsers.insert(
             TokenType::LParenthesis,
             Rc::new(|p, left| p.parse_call_expression(left)),
         );
@@ -517,6 +521,19 @@ impl Parser {
         })
     }
 
+    fn parse_index_expression(&mut self, list: Node) -> Result<Node, String> {
+        let token = self.tokens.current().unwrap().clone();
+        self.tokens.to_next();
+        let index = self.parse_expression(Precedence::Lowest)?;
+        self.tokens.to_next();
+
+        Ok(Node::IndexExpression {
+            token,
+            left: Box::new(list),
+            index: Box::new(index),
+        })
+    }
+
     fn parse_call_expression(&mut self, function: Node) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut arguments = vec![];
@@ -560,7 +577,7 @@ mod parser_test {
         🫷
         ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛 ↙️
         🈯 🌜🅰️🦶 🅱️🌛
-        👉🅰️🦶 🅱️👈
+        👉🅰️🦶 🅱️👈👉0️⃣👈
         🗨️🈶🅰️🈚🅱️🈲🆎
             ",
         );
@@ -570,7 +587,7 @@ mod parser_test {
             "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
             "🈯🌜🅰️🦶 🅱️🌛 ↙️",
-            "👉🅰️🦶 🅱️👈 ↙️"
+            "👉🅰️🦶 🅱️👈👉0️⃣👈 ↙️",
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",
