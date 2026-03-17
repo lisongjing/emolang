@@ -1,6 +1,6 @@
 use std::{collections::HashMap, sync::Arc};
 
-use crate::{types::Node, util::emoji_convert::{null_emoji, boolean_to_emoji, float_to_emoji, integer_to_emoji}};
+use crate::{types::Node, util::emoji_convert::object_to_emoji};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Object {
@@ -120,16 +120,8 @@ impl BuiltinFunction {
             return Err(format!("Expected 1 argument(s), but got {}", args.len()));
         }
 
-        let string = match args.first().unwrap() {
-            Object::String(value) => value.clone(),
-            Object::Integer(value) => integer_to_emoji(value),
-            Object::Float(value) => float_to_emoji(value),
-            Object::Boolean(value) => boolean_to_emoji(value),
-            Object::Null => null_emoji(),
-            _ => return Err(format!("Incompatible argument type with string: {:?}", args.first().unwrap())),
-        };
-
-        Ok(Object::String(string))
+        object_to_emoji(args.first().unwrap())
+            .map(Object::String)
     }
 
     fn print(args: &[Object]) -> Result<Object, String> {

@@ -125,6 +125,7 @@ impl<T: PartialEq> StatefulVector<T> {
 }
 
 pub mod emoji_convert {
+    use crate::types::Object;
 
     const DOT: char = '.';
     const NULL_EMOJI: &str = "🈳";
@@ -167,5 +168,24 @@ pub mod emoji_convert {
 
     pub fn boolean_to_emoji(boolean: &bool) -> String {
         String::from(if *boolean { "✔️" } else { "❌" })
+    }
+
+    pub fn object_to_emoji(object: &Object) -> Result<String, String> {
+        let string = match object {
+            Object::String(value) => value.clone(),
+            Object::Integer(value) => integer_to_emoji(value),
+            Object::Float(value) => float_to_emoji(value),
+            Object::Boolean(value) => boolean_to_emoji(value),
+            Object::Null => null_emoji(),
+            Object::List(value) => {
+                let mut elements = vec![];
+                for element in value {
+                    elements.push(object_to_emoji(element)?);
+                }
+                format!("👉{}👈", elements.join("🦶 "))
+            },
+            _ => return Err(format!("Incompatible argument type with string: {:?}", object)),
+        };
+        Ok(string)
     }
 }
