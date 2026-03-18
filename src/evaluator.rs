@@ -12,6 +12,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
         Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right, env)?),
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
+        Node::IndexExpression { token: _, left, index } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
         Node::BlockStatement { token: _, statements } => eval_block_statements(statements, env),
         Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(*condition, *consequence, alternative, env),
         Node::WhileExpression { token: _, condition, body } => eval_while_expression(*condition, *body, env),
@@ -198,6 +199,19 @@ fn eval_list_infix_expression(operator: String, left: &Vec<Object>, right: &Vec<
     }
 }
 
+fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> {
+    if let Object::Integer(index) = index && index >= 0 {
+        match left {
+            Object::List(elements) => elements.get(index as usize)
+                .cloned()
+                .ok_or_else(|| format!("Invalid index: {index}")),
+            _ => Err(String::from("Invalid collection type to index")),
+        }
+    } else {
+        Err(String::from("Index must be an integer greater than or equal to 0"))
+    }
+}
+
 fn eval_if_expression(condition: Node, consequence: Node, alternative: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
     if eval_condition(condition, env)? {
         eval(consequence, env)
@@ -290,7 +304,8 @@ mod evaluator_test {
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷
         🫷
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛
-        🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️🌛
+        🅰️ ⬅️ 👉🅰️🦶 1️⃣🦶 3️⃣👈
+        🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️👉3️⃣ ➖ 3️⃣👈🌛
         ",
         );
 
