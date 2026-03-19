@@ -56,6 +56,7 @@ impl<'a> Lexer<'a> {
                 "⭕" => Token::from_str(TokenType::While, char),
                 "📛" => Token::from_str(TokenType::Function, char),
                 "🔙" => Token::from_str(TokenType::Return, char),
+                "➡️" => Token::from_str(TokenType::Colon, char),
                 "🦶" => Token::from_str(TokenType::Comma, char),
                 "🌜" => Token::from_str(TokenType::LParenthesis, char),
                 "🌛" => Token::from_str(TokenType::RParenthesis, char),
@@ -184,6 +185,7 @@ mod lexer_test {
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
         ⏸️🌜❌🟰0️⃣◀️1️⃣🌛
+        👉 🗨️🅰️💬 ➡️ 1️⃣ 👈
         ",
         );
         let target = vec![
@@ -252,6 +254,12 @@ mod lexer_test {
             Token::from_str(TokenType::LessThan, "◀️"),
             Token::from_str(TokenType::Integer, "1"),
             Token::from_str(TokenType::RParenthesis, "🌛"),
+            Token::from_str(TokenType::Semicolon, "\n"),
+            Token::from_str(TokenType::LBracket, "👉"),
+            Token::from_str(TokenType::String, "🗨️🅰️💬"),
+            Token::from_str(TokenType::Colon, "➡️"),
+            Token::from_str(TokenType::Integer, "1"),
+            Token::from_str(TokenType::RBracket, "👈"),
             Token::from_str(TokenType::Semicolon, "\n"),
         ];
         let mut lexer = Lexer::new(&source);
