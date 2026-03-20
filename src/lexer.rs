@@ -141,7 +141,7 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_new_line(&self, tokens: &StatefulVector<Token>) -> Option<Token> {
-        if tokens.last().is_some_and(|token| ![TokenType::Semicolon, TokenType::Start, TokenType::LBrace, TokenType::RBrace].contains(&token.token_type)) {
+        if tokens.last().is_some_and(|token| ![TokenType::Semicolon, TokenType::Start].contains(&token.token_type)) {
             Some(Token::from_str(TokenType::Semicolon, self.chars.current().unwrap()))
         } else {
             None
@@ -185,7 +185,7 @@ mod lexer_test {
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
         ⏸️🌜❌🟰0️⃣◀️1️⃣🌛
-        👉 🗨️🅰️💬 ➡️ 1️⃣ 👈
+        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🗨️🅱️💬 ➡️ 9️⃣ 🫷
         ",
         );
         let target = vec![
@@ -210,6 +210,7 @@ mod lexer_test {
             Token::from_str(TokenType::Identifier, "🅱️"),
             Token::from_str(TokenType::RParenthesis, "🌛"),
             Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::While, "⭕"),
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::GreaterThanOrEqual, "▶️🟰"),
@@ -219,6 +220,7 @@ mod lexer_test {
             Token::from_str(TokenType::LessThanOrEqual, "◀️🟰"),
             Token::from_str(TokenType::Integer, "5"),
             Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::Assign, "⬅️"),
             Token::from_str(TokenType::Identifier, "🅰️"),
@@ -232,6 +234,7 @@ mod lexer_test {
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::Return, "🔙"),
             Token::from_str(TokenType::If, "❓"),
             Token::from_str(TokenType::Identifier, "🅰️"),
@@ -246,6 +249,7 @@ mod lexer_test {
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Semicolon, "↙️"),
             Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::Not, "⏸️"),
             Token::from_str(TokenType::LParenthesis, "🌜"),
             Token::from_str(TokenType::False, "❌"),
@@ -255,11 +259,15 @@ mod lexer_test {
             Token::from_str(TokenType::Integer, "1"),
             Token::from_str(TokenType::RParenthesis, "🌛"),
             Token::from_str(TokenType::Semicolon, "\n"),
-            Token::from_str(TokenType::LBracket, "👉"),
+            Token::from_str(TokenType::LBrace, "🫸"),
             Token::from_str(TokenType::String, "🗨️🅰️💬"),
             Token::from_str(TokenType::Colon, "➡️"),
             Token::from_str(TokenType::Integer, "1"),
-            Token::from_str(TokenType::RBracket, "👈"),
+            Token::from_str(TokenType::Comma, "🦶"),
+            Token::from_str(TokenType::String, "🗨️🅱️💬"),
+            Token::from_str(TokenType::Colon, "➡️"),
+            Token::from_str(TokenType::Integer, "9"),
+            Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Semicolon, "\n"),
         ];
         let mut lexer = Lexer::new(&source);
