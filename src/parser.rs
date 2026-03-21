@@ -52,7 +52,7 @@ impl Parser {
         self.prefix_exp_parsers
             .insert(TokenType::String, Rc::new(|p| p.parse_string_literal()));
         self.prefix_exp_parsers
-            .insert(TokenType::LBracket, Rc::new(|p| p.parse_list_expression()));
+            .insert(TokenType::LBracket, Rc::new(|p| p.parse_list_literal()));
 
         self.prefix_exp_parsers
             .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
@@ -338,7 +338,7 @@ impl Parser {
         Ok(Node::StringLiteral { token, value })
     }
 
-    fn parse_list_expression(&mut self) -> Result<Node, String> {
+    fn parse_list_literal(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let mut elements = vec![];
         while self
