@@ -53,6 +53,8 @@ impl Parser {
             .insert(TokenType::String, Rc::new(|p| p.parse_string_literal()));
         self.prefix_exp_parsers
             .insert(TokenType::LBracket, Rc::new(|p| p.parse_list_literal()));
+        self.prefix_exp_parsers
+            .insert(TokenType::LBrace, Rc::new(|p| p.parse_map_literal()));
 
         self.prefix_exp_parsers
             .insert(TokenType::Not, Rc::new(|p| p.parse_prefix_expression()));
@@ -367,6 +369,48 @@ impl Parser {
         Ok(Node::ListLiteral { token, elements })
     }
 
+    fn parse_map_literal(&mut self) -> Result<Node, String> {
+        let token = self.tokens.current().unwrap().clone();
+        let mut entries = vec![];
+        while self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RBrace)
+            .is_some()
+        {
+            let key = self.parse_expression(Precedence::Lowest)?;
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type != TokenType::Describe)
+            {
+                return Err(format!("Expected a ➡️, but got a {}", token.literal));
+            }
+            self.tokens.to_next();
+            self.tokens.to_next();
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+
+            entries.push((key, value));
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RBrace)
+            {
+                continue;
+            }
+
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
+                return Err(format!("Expected a comma, but got a {}", token.literal));
+            }
+        }
+        Ok(Node::MapLiteral { token, entries })
+    }
+
     fn parse_prefix_expression(&mut self) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
         let operator = token.literal.clone();
@@ -582,6 +626,7 @@ mod parser_test {
         ⬅️⏸️🌜❌🟰0️⃣◀️1️⃣🌛 ↙️
         🈯 🌜🅰️🦶 🅱️🌛
         👉🅰️🦶 🅱️👈👉0️⃣👈
+        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🗨️🅱️💬 ➡️ 9️⃣ 🫷
         🗨️🈶🅰️🈚🅱️🈲🆎
             ",
         );
@@ -592,6 +637,7 @@ mod parser_test {
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
             "🈯🌜🅰️🦶 🅱️🌛 ↙️",
             "👉🅰️🦶 🅱️👈👉0️⃣👈 ↙️",
+            "🫸🗨️🅰️💬 ➡️ 1️⃣🦶 🗨️🅱️💬 ➡️ 9️⃣🫷 ↙️",
         ];
         let target_errors = vec![
             "Expected a expression, but got a ⬅️",

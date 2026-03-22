@@ -88,6 +88,10 @@ pub enum Node {
         token: Token,
         elements: Vec<Node>,
     },
+    MapLiteral {
+        token: Token,
+        entries: Vec<(Node, Node)>,
+    },
     PrefixExpression {
         token: Token,
         operator: String,
@@ -145,6 +149,7 @@ impl Node {
             Node::BooleanLiteral { token, value: _ } => &token.literal,
             Node::StringLiteral { token, value: _ } => &token.literal,
             Node::ListLiteral { token, elements: _ } => &token.literal,
+            Node::MapLiteral { token, entries: _ } => &token.literal,
             Node::PrefixExpression {
                 token,
                 operator: _,
@@ -216,6 +221,14 @@ impl Node {
                 elements
                     .iter()
                     .map(|exp| exp.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 ")
+            ),
+            Node::MapLiteral { token: _, entries } => format!(
+                "🫸{}🫷",
+                entries
+                    .iter()
+                    .map(|(key, value)| format!("{} ➡️ {}", key.string(), value.string()))
                     .collect::<Vec<String>>()
                     .join("🦶 ")
             ),
