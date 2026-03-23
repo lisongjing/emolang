@@ -154,7 +154,6 @@ impl Parser {
         match self.tokens.current().unwrap().token_type {
             TokenType::Identifier => self.parse_assign_statement(),
             TokenType::Return => self.parse_return_statement(),
-            TokenType::LBrace => self.parse_block_statement(),
             TokenType::Semicolon => {
                 self.tokens.to_next();
                 self.parse_statement()
