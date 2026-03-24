@@ -1,4 +1,6 @@
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, hash::Hash, sync::Arc};
+
+use ordered_float::OrderedFloat;
 
 use crate::{types::Node, util::emoji_convert::object_to_emoji};
 
@@ -10,6 +12,7 @@ pub enum Object {
     String(String),
     Null,
     List(Vec<Object>),
+    Map(HashMap<Object, Object>),
     ReturnValue(Box<Object>),
     Function {
         parameters: Vec<Node>,
@@ -25,14 +28,70 @@ impl Object {
             Object::Integer(value) => value.to_string(),
             Object::Float(value) => value.to_string(),
             Object::Boolean(value) => value.to_string(),
-            Object::String(value) => value.clone(),
+            Object::String(value) => format!("\"{}\"", value),
             Object::Null => "null".to_string(),
             Object::List(value) => format!("[{}]", value.iter().map(|obj| obj.inspect()).collect::<Vec<String>>().join(", ")),
+            Object::Map(value) => format!("{{{}}}", value.iter().map(|(k, v)| format!("{}: {}", k.inspect(), v.inspect())).collect::<Vec<String>>().join(", ")),
             Object::ReturnValue(value) => value.inspect(),
             Object::Function { parameters, body, env: _ } => format!("fn({}) {}", parameters.iter().map(|node| node.string()).collect::<Vec<String>>().join(", "), body.string()),
             Object::BuiltinFunction(function) => format!("{}(args...){{ //builtin implementation }}", function.name()),
         }
     }
+}
+
+impl Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+
+        match self {
+            Object::Integer(value) => {
+                0u32.hash(state);
+                value.hash(state);
+            },
+            Object::Float(value) => {
+                1u32.hash(state);
+                OrderedFloat(*value).hash(state);
+            },
+            Object::Boolean(value) => {
+                2u32.hash(state);
+                value.hash(state);
+            },
+            Object::String(value) => {
+                3u32.hash(state);
+                value.hash(state);
+            },
+            Object::Null => {
+                4u32.hash(state);
+            },
+            Object::List(elements) => {
+                5u32.hash(state);
+                for element in elements {
+                    element.hash(state);
+                }
+            },
+            Object::Map(entries) => {
+                6u32.hash(state);
+                for (key, value) in entries {
+                    key.hash(state);
+                    value.hash(state);
+                }
+            },
+            Object::ReturnValue(value) => {
+                7u32.hash(state);
+                value.hash(state);
+            },
+            Object::Function { parameters: _, body, env: _ } => {
+                8u32.hash(state);
+                body.string().hash(state);
+            },
+            Object::BuiltinFunction(value) => {
+                9u32.hash(state);
+                value.name().hash(state);
+            },
+        }
+    }
+}
+
+impl Eq for Object {
 }
 
 pub const TRUE: Object = Object::Boolean(true);
