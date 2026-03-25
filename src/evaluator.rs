@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::types::{Node, object::*};
 
 
@@ -10,6 +12,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::BooleanLiteral { token: _, value } => Ok(Object::Boolean(value)),
         Node::StringLiteral { token: _, value } => Ok(Object::String(value)),
         Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
+        Node::MapLiteral { token: _, entries } => eval_map_literal(entries, env),
         Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right, env)?),
         Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::IndexExpression { token: _, left, index } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
@@ -67,6 +70,14 @@ fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Objec
         value.push(eval(node, env)?);
     }
     Ok(Object::List(value))
+}
+
+fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result<Object, String> {
+    let mut value = HashMap::new();
+    for (key, val) in entries {
+        value.insert(eval(key, env)?, eval(val, env)?);
+    }
+    Ok(Object::Map(value))
 }
 
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
@@ -306,6 +317,8 @@ mod evaluator_test {
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛
         🅰️ ⬅️ 👉🅰️🦶 1️⃣🦶 3️⃣👈
         🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️👉3️⃣ ➖ 3️⃣👈🌛
+        🅱️ ⬅️ 🅰️👉3️⃣ ➖ 3️⃣👈
+        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🅱️ ➡️ 9️⃣ 🫷
         ",
         );
 
@@ -316,6 +329,9 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::String("🅰️ 🟰 5️⃣".to_string()));
+        let mut expected = HashMap::new();
+        expected.insert(Object::String(String::from("🅰️")), Object::Integer(1));
+        expected.insert(Object::Integer(5), Object::Integer(9));
+        assert_eq!(evaluated.unwrap(), Object::Map(expected));
     }
 }
