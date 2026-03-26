@@ -211,15 +211,21 @@ fn eval_list_infix_expression(operator: String, left: &Vec<Object>, right: &Vec<
 }
 
 fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> {
-    if let Object::Integer(index) = index && index >= 0 {
-        match left {
-            Object::List(elements) => elements.get(index as usize)
+    match left {
+        Object::List(elements) => 
+            if let Object::Integer(index) = index && index >= 0 {
+                elements.get(index as usize)
+                    .cloned()
+                    .ok_or_else(|| format!("Invalid index: {index}"))
+            } else {
+                Err(String::from("Index must be an integer greater than or equal to 0"))
+            },
+        Object::Map(entries) => 
+            entries
+                .get(&index)
                 .cloned()
-                .ok_or_else(|| format!("Invalid index: {index}")),
-            _ => Err(String::from("Invalid collection type to index")),
-        }
-    } else {
-        Err(String::from("Index must be an integer greater than or equal to 0"))
+                .ok_or_else(|| format!("Invalid index: {index:?}")),
+        _ => Err(String::from("Invalid collection type to index")),
     }
 }
 
@@ -318,7 +324,7 @@ mod evaluator_test {
         🅰️ ⬅️ 👉🅰️🦶 1️⃣🦶 3️⃣👈
         🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️👉3️⃣ ➖ 3️⃣👈🌛
         🅱️ ⬅️ 🅰️👉3️⃣ ➖ 3️⃣👈
-        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🅱️ ➡️ 9️⃣ 🫷
+        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🅱️ ➡️ 9️⃣ 🫷👉🗨️🅰️💬👈
         ",
         );
 
@@ -329,9 +335,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        let mut expected = HashMap::new();
-        expected.insert(Object::String(String::from("🅰️")), Object::Integer(1));
-        expected.insert(Object::Integer(5), Object::Integer(9));
-        assert_eq!(evaluated.unwrap(), Object::Map(expected));
+        assert_eq!(evaluated.unwrap(), Object::Integer(1));
     }
 }
