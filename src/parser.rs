@@ -572,13 +572,15 @@ impl Parser {
         let token = self.tokens.current().unwrap().clone();
         self.tokens.to_next();
         let index = self.parse_expression(Precedence::Lowest)?;
-        self.tokens.to_next();
-
-        Ok(Node::IndexExpression {
-            token,
-            left: Box::new(list),
-            index: Box::new(index),
-        })
+        if let Some(tok) = self.tokens.to_next() && tok.token_type == TokenType::RBracket {
+            Ok(Node::IndexExpression {
+                token,
+                left: Box::new(list),
+                index: Box::new(index),
+            })
+        } else {
+            Err("Expected a right bracket".to_string())
+        }
     }
 
     fn parse_call_expression(&mut self, function: Node) -> Result<Node, String> {
