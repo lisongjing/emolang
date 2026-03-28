@@ -184,6 +184,13 @@ pub mod emoji_convert {
                 }
                 format!("👉{}👈", elements.join("🦶 "))
             },
+            Object::Map(value) => {
+                let mut entries = vec![];
+                for (key, val) in value {
+                    entries.push(format!("{} ➡️ {}", object_to_emoji(key)?, object_to_emoji(val)?));
+                }
+                format!("🫸{}🫷", entries.join("🦶 "))
+            },
             _ => return Err(format!("Incompatible argument type with string: {:?}", object)),
         };
         Ok(string)
