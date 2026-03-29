@@ -2,43 +2,89 @@ use std::collections::HashMap;
 
 use crate::types::{Node, object::*};
 
-
 pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
         Node::Program { statements } => eval_program(statements, env),
-        Node::ExpressionStatement { token: _, expression } => eval(*expression, env),
+        Node::ExpressionStatement {
+            token: _,
+            expression,
+        } => eval(*expression, env),
         Node::IntegerLiteral { token: _, value } => Ok(Object::Integer(value)),
         Node::FloatLiteral { token: _, value } => Ok(Object::Float(value)),
         Node::BooleanLiteral { token: _, value } => Ok(Object::Boolean(value)),
         Node::StringLiteral { token: _, value } => Ok(Object::String(value)),
         Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
         Node::MapLiteral { token: _, entries } => eval_map_literal(entries, env),
-        Node::PrefixExpression { token: _, operator, right } => eval_prefix_expression(operator, eval(*right, env)?),
-        Node::InfixExpression { token: _, left, operator, right } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
-        Node::IndexExpression { token: _, left, index } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
-        Node::BlockStatement { token: _, statements } => eval_block_statements(statements, env),
-        Node::IfExpression { token: _, condition, consequence, alternative } => eval_if_expression(*condition, *consequence, alternative, env),
-        Node::WhileExpression { token: _, condition, body } => eval_while_expression(*condition, *body, env),
-        Node::ReturnStatement { token: _, value } => Ok(Object::ReturnValue(Box::new(eval(*value, env)?))),
-        Node::AssignStatement { token: _, name, value } => {
+        Node::PrefixExpression {
+            token: _,
+            operator,
+            right,
+        } => eval_prefix_expression(operator, eval(*right, env)?),
+        Node::InfixExpression {
+            token: _,
+            left,
+            operator,
+            right,
+        } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
+        Node::IndexExpression {
+            token: _,
+            left,
+            index,
+        } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
+        Node::BlockStatement {
+            token: _,
+            statements,
+        } => eval_block_statements(statements, env),
+        Node::IfExpression {
+            token: _,
+            condition,
+            consequence,
+            alternative,
+        } => eval_if_expression(*condition, *consequence, alternative, env),
+        Node::WhileExpression {
+            token: _,
+            condition,
+            body,
+        } => eval_while_expression(*condition, *body, env),
+        Node::ReturnStatement { token: _, value } => {
+            Ok(Object::ReturnValue(Box::new(eval(*value, env)?)))
+        }
+        Node::AssignStatement {
+            token: _,
+            name,
+            value,
+        } => {
             let value = eval(*value, env)?;
             // todo assert name is identifier
             env.set(name.string(), value.clone());
             Ok(value)
-        },
+        }
         Node::Identifier { token: _, value } => eval_identifier(&value, env),
-        Node::FunctionLiteral { token: _, name, parameters, body } => {
-            let function = Object::Function { parameters, body, env: Box::new(env.clone()) };
+        Node::FunctionLiteral {
+            token: _,
+            name,
+            parameters,
+            body,
+        } => {
+            let function = Object::Function {
+                parameters,
+                body,
+                env: Box::new(env.clone()),
+            };
             if let Some(name) = name {
                 env.set(name.string(), function.clone());
             }
             Ok(function)
-        },
-        Node::CallExpression { token: _, function, arguments } => {
+        }
+        Node::CallExpression {
+            token: _,
+            function,
+            arguments,
+        } => {
             let function = eval(*function, env)?;
             let args = eval_expressions(arguments, env)?;
             apply_function(function, args)
-        },
+        }
     }
 }
 
@@ -84,16 +130,20 @@ fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, Str
     match operator.as_str() {
         "⏸️" => eval_prefix_not_expression(&right),
         "➖" => eval_prefix_minus_expression(&right),
-        _ => Err(String::from("Invalid prefix expressions to evaluate values"))
+        _ => Err(String::from(
+            "Invalid prefix expressions to evaluate values",
+        )),
     }
 }
 
 fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
     if let Object::ReturnValue(_) = &obj {
-        return Err(String::from("Invalid prefix not expression to evaluate return expression"));
+        return Err(String::from(
+            "Invalid prefix not expression to evaluate return expression",
+        ));
     }
     let value = match obj {
-        Object::Integer(value) => *value > 0 ,
+        Object::Integer(value) => *value > 0,
         Object::Float(value) => *value > 0.0,
         Object::Boolean(value) => *value,
         Object::String(value) => !value.is_empty(),
@@ -106,37 +156,60 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
 
 fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
     match obj {
-        Object::Integer(value) => Ok(Object::Integer(-value)) ,
-        Object::Float(value) => Ok(Object::Float(-value)) ,
-        _ => Err(String::from("Invalid prefix minus expression to evaluate non-numeric value")),
+        Object::Integer(value) => Ok(Object::Integer(-value)),
+        Object::Float(value) => Ok(Object::Float(-value)),
+        _ => Err(String::from(
+            "Invalid prefix minus expression to evaluate non-numeric value",
+        )),
     }
 }
 
 fn eval_infix_expression(operator: String, left: Object, right: Object) -> Result<Object, String> {
-    if let Object::Integer(left) = left && let Object::Integer(right) = right {
+    if let Object::Integer(left) = left
+        && let Object::Integer(right) = right
+    {
         eval_integer_infix_expression(operator, left, right)
-    } else if let Object::Integer(left) = left && let Object::Float(right) = right {
+    } else if let Object::Integer(left) = left
+        && let Object::Float(right) = right
+    {
         eval_float_infix_expression(operator, left as f64, right)
-    } else if let Object::Float(left) = left && let Object::Float(right) = right {
+    } else if let Object::Float(left) = left
+        && let Object::Float(right) = right
+    {
         eval_float_infix_expression(operator, left, right)
-    } else if let Object::Float(left) = left && let Object::Integer(right) = right {
+    } else if let Object::Float(left) = left
+        && let Object::Integer(right) = right
+    {
         eval_float_infix_expression(operator, left, right as f64)
-    } else if let Object::Boolean(left) = left && let Object::Boolean(right) = right {
+    } else if let Object::Boolean(left) = left
+        && let Object::Boolean(right) = right
+    {
         eval_boolean_infix_expression(operator, left, right)
-    } else if let Object::String(ref left) = left && let Object::String(ref right) = right {
+    } else if let Object::String(ref left) = left
+        && let Object::String(ref right) = right
+    {
         eval_string_infix_expression(operator, left, right)
-    } else if let Object::List(ref left) = left && let Object::List(ref right) = right {
+    } else if let Object::List(ref left) = left
+        && let Object::List(ref right) = right
+    {
         eval_list_infix_expression(operator, left, right)
     } else if operator == "🟰" {
         Ok(to_bool_object(left == right))
     } else if operator == "❗🟰" {
         Ok(to_bool_object(left != right))
     } else {
-        Err(format!("Invalid infix expression: {:?} {} {:?}", left, operator, right))
+        Err(format!(
+            "Invalid infix expression: {:?} {} {:?}",
+            left, operator, right
+        ))
     }
 }
 
-fn eval_integer_infix_expression(operator: String, left: i64, right: i64) -> Result<Object, String> {
+fn eval_integer_infix_expression(
+    operator: String,
+    left: i64,
+    right: i64,
+) -> Result<Object, String> {
     match operator.as_str() {
         "➕" => Ok(Object::Integer(left + right)),
         "➖" => Ok(Object::Integer(left - right)),
@@ -149,7 +222,7 @@ fn eval_integer_infix_expression(operator: String, left: i64, right: i64) -> Res
         "▶️🟰" => Ok(to_bool_object(left >= right)),
         "◀️" => Ok(to_bool_object(left < right)),
         "◀️🟰" => Ok(to_bool_object(left <= right)),
-        _ => Err(String::from("Invalid infix expression operator"))
+        _ => Err(String::from("Invalid infix expression operator")),
     }
 }
 
@@ -166,44 +239,60 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
         "▶️🟰" => Ok(to_bool_object(left >= right)),
         "◀️" => Ok(to_bool_object(left < right)),
         "◀️🟰" => Ok(to_bool_object(left <= right)),
-        _ => Err(String::from("Invalid infix expression operator"))
+        _ => Err(String::from("Invalid infix expression operator")),
     }
 }
 
-fn eval_boolean_infix_expression(operator: String, left: bool, right: bool) -> Result<Object, String> {
+fn eval_boolean_infix_expression(
+    operator: String,
+    left: bool,
+    right: bool,
+) -> Result<Object, String> {
     match operator.as_str() {
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
         "🔁" => Ok(to_bool_object(left && right)),
         "🔀" => Ok(to_bool_object(left || right)),
-        _ => Err(String::from("Invalid infix expression operator"))
+        _ => Err(String::from("Invalid infix expression operator")),
     }
 }
 
-fn eval_string_infix_expression(operator: String, left: &str, right: &str) -> Result<Object, String> {
+fn eval_string_infix_expression(
+    operator: String,
+    left: &str,
+    right: &str,
+) -> Result<Object, String> {
     match operator.as_str() {
         "➕" => {
             let mut join = String::from(left);
             join.push_str(right);
             Ok(Object::String(join))
-        },
+        }
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
-        _ => Err(String::from("Invalid infix expression operator"))
+        _ => Err(String::from("Invalid infix expression operator")),
     }
 }
 
-fn eval_list_infix_expression(operator: String, left: &Vec<Object>, right: &Vec<Object>) -> Result<Object, String> {
+fn eval_list_infix_expression(
+    operator: String,
+    left: &Vec<Object>,
+    right: &Vec<Object>,
+) -> Result<Object, String> {
     match operator.as_str() {
         "➕" => {
             let mut union = left.clone();
             union.extend_from_slice(right);
             Ok(Object::List(union))
-        },
+        }
         "➖" => {
-            let difference = left.clone().into_iter().filter(|x| !right.contains(x)).collect::<Vec<Object>>();
+            let difference = left
+                .clone()
+                .into_iter()
+                .filter(|x| !right.contains(x))
+                .collect::<Vec<Object>>();
             Ok(Object::List(difference))
-        },
+        }
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
         _ => Err(String::from("Invalid infix expression operator")),
@@ -212,24 +301,34 @@ fn eval_list_infix_expression(operator: String, left: &Vec<Object>, right: &Vec<
 
 fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> {
     match left {
-        Object::List(elements) => 
-            if let Object::Integer(index) = index && index >= 0 {
-                elements.get(index as usize)
+        Object::List(elements) => {
+            if let Object::Integer(index) = index
+                && index >= 0
+            {
+                elements
+                    .get(index as usize)
                     .cloned()
                     .ok_or_else(|| format!("Invalid index: {index}"))
             } else {
-                Err(String::from("Index must be an integer greater than or equal to 0"))
-            },
-        Object::Map(entries) => 
-            entries
-                .get(&index)
-                .cloned()
-                .ok_or_else(|| format!("Invalid index: {index:?}")),
+                Err(String::from(
+                    "Index must be an integer greater than or equal to 0",
+                ))
+            }
+        }
+        Object::Map(entries) => entries
+            .get(&index)
+            .cloned()
+            .ok_or_else(|| format!("Invalid index: {index:?}")),
         _ => Err(String::from("Invalid collection type to index")),
     }
 }
 
-fn eval_if_expression(condition: Node, consequence: Node, alternative: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
+fn eval_if_expression(
+    condition: Node,
+    consequence: Node,
+    alternative: Option<Box<Node>>,
+    env: &mut Environment,
+) -> Result<Object, String> {
     if eval_condition(condition, env)? {
         eval(consequence, env)
     } else if let Some(alternative) = alternative {
@@ -239,7 +338,11 @@ fn eval_if_expression(condition: Node, consequence: Node, alternative: Option<Bo
     }
 }
 
-fn eval_while_expression(condition: Node, body: Node, env: &mut Environment) -> Result<Object, String> {
+fn eval_while_expression(
+    condition: Node,
+    body: Node,
+    env: &mut Environment,
+) -> Result<Object, String> {
     while eval_condition(condition.clone(), env)? {
         eval(body.clone(), env)?;
     }
@@ -270,16 +373,24 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
     match function {
-        Object::Function { parameters, body, env } => {
+        Object::Function {
+            parameters,
+            body,
+            env,
+        } => {
             if parameters.len() != args.len() {
-                return Err(format!("Expected {} argument(s), but got {}", parameters.len(), args.len()))
+                return Err(format!(
+                    "Expected {} argument(s), but got {}",
+                    parameters.len(),
+                    args.len()
+                ));
             }
             let mut env = Environment::new_enclosed(env);
             for (index, param) in parameters.iter().enumerate() {
                 if let Node::Identifier { token: _, value } = param {
                     env.set(value.clone(), args.get(index).unwrap().clone());
                 } else {
-                    return Err(format!("Not a identifier: {}", param.string()))
+                    return Err(format!("Not a identifier: {}", param.string()));
                 }
             }
             let return_val = eval(*body, &mut env)?;
@@ -288,10 +399,8 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
             } else {
                 Ok(return_val)
             }
-        },
-        Object::BuiltinFunction(function) => {
-            function.call(&args)
-        },
+        }
+        Object::BuiltinFunction(function) => function.call(&args),
         _ => Err(format!("Not a function: {}", function.inspect())),
     }
 }
@@ -299,7 +408,6 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
 fn to_bool_object(value: bool) -> Object {
     if value { TRUE } else { FALSE }
 }
-
 
 #[cfg(test)]
 mod evaluator_test {
@@ -310,7 +418,7 @@ mod evaluator_test {
     #[test]
     fn test() {
         let source = String::from(
-                "
+            "
         1️⃣⚪3️⃣ ➕ 9️⃣
         #️⃣ ⏸️❌
         📛 🈯 🌜🅰️🦶 🅱️🌛 🫸
@@ -331,7 +439,7 @@ mod evaluator_test {
         let mut lexer = Lexer::new(&source);
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
-        let mut env = Environment::new();
+        let mut env = Environment::new_default();
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());

@@ -3,7 +3,7 @@ use std::io::{self, Write};
 use crate::{evaluator::eval, lexer::Lexer, parser::Parser, types::Environment};
 
 pub fn start() {
-    let mut env = Environment::new();
+    let mut env = Environment::new_default();
     loop {
         print!(">> ");
         io::stdout()
