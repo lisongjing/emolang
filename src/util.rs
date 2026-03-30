@@ -140,10 +140,6 @@ pub mod emoji_convert {
         DOT
     }
 
-    pub fn null_emoji() -> String {
-        String::from(NULL_EMOJI)
-    }
-
     pub fn integer_to_emoji(integer: &i64) -> String {
         integer
             .to_string()
@@ -172,11 +168,11 @@ pub mod emoji_convert {
 
     pub fn object_to_emoji(object: &Object) -> Result<String, String> {
         let string = match object {
-            Object::String(value) => value.clone(),
             Object::Integer(value) => integer_to_emoji(value),
             Object::Float(value) => float_to_emoji(value),
             Object::Boolean(value) => boolean_to_emoji(value),
-            Object::Null => null_emoji(),
+            Object::String(value) => value.clone(),
+            Object::Null => String::from(NULL_EMOJI),
             Object::List(value) => {
                 let mut elements = vec![];
                 for element in value {
@@ -191,6 +187,7 @@ pub mod emoji_convert {
                 }
                 format!("🫸{}🫷", entries.join("🦶 "))
             },
+            Object::ReturnValue(value) => object_to_emoji(value)?,
             _ => return Err(format!("Incompatible argument type with string: {:?}", object)),
         };
         Ok(string)

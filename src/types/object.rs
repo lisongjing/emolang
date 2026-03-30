@@ -70,22 +70,15 @@ impl Object {
         }
     }
 
-    pub fn private_env(&self) -> Environment {
+    pub fn associated_env(&self) -> Environment {
         match self {
             Object::Integer(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
             Object::Float(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
             Object::Boolean(_) => todo!(),
             Object::String(_) => todo!(),
-            Object::Null => todo!(),
             Object::List(_) => todo!(),
             Object::Map(_) => todo!(),
-            Object::ReturnValue(_) => todo!(),
-            Object::Function {
-                parameters: _,
-                body: _,
-                env: _,
-            } => todo!(),
-            Object::BuiltinFunction(_) => Environment::new_default(),
+            _ => Environment::new_empty(),
         }
     }
 }
