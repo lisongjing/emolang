@@ -14,7 +14,7 @@ pub enum Precedence {
     Product,     // ✖️/➗/〰️
     Prefix,      // ➖x/⏸️x
     Call,        // fn🌜🌛
-    Index,       // list👉 👈
+    Index,       // list/map👉 👈 instance❇️
 }
 
 impl Precedence {
@@ -35,6 +35,7 @@ impl Precedence {
             TokenType::Modulo => Precedence::Product,
             TokenType::LParenthesis => Precedence::Call,
             TokenType::LBracket => Precedence::Index,
+            TokenType::Member => Precedence::Index,
             _ => Precedence::Lowest,
         }
     }
@@ -324,7 +325,7 @@ impl Node {
                 instance,
                 field,
             } => format!(
-                "{}➡️{}",
+                "{}❇️{}",
                 instance.string(),
                 field.string(),
             ),
@@ -333,7 +334,7 @@ impl Node {
                 instance,
                 method,
             } => format!(
-                "{}➡️{}",
+                "{}❇️{}",
                 instance.string(),
                 method.string(),
             ),

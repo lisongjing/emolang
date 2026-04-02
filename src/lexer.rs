@@ -57,6 +57,7 @@ impl<'a> Lexer<'a> {
                 "📛" => Token::from_str(TokenType::Function, char),
                 "🔙" => Token::from_str(TokenType::Return, char),
                 "➡️" => Token::from_str(TokenType::Describe, char),
+                "❇️" => Token::from_str(TokenType::Member, char),
                 "🦶" => Token::from_str(TokenType::Comma, char),
                 "🌜" => Token::from_str(TokenType::LParenthesis, char),
                 "🌛" => Token::from_str(TokenType::RParenthesis, char),
