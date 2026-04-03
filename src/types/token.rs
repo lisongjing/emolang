@@ -82,6 +82,6 @@ impl Token {
     }
 
     pub fn this() -> Token {
-        Token::from(TokenType::Identifier, String::from("❇️"))
+        Token::from(TokenType::Identifier, String::from("🈯"))
     }
 }

@@ -80,7 +80,7 @@ impl Object {
             Object::Map(_) => todo!(),
             _ => Environment::new_empty(),
         };
-        env.set("❇️".to_string(), self.clone());
+        env.set("🈯".to_string(), self.clone());
         env
     }
 }
