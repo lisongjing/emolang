@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::types::{Node, object::*};
+use crate::types::{Node, Token, object::*};
 
 pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
@@ -85,6 +85,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             let args = eval_expressions(arguments, env)?;
             apply_function(function, args)
         }
+        Node::MemberExpression {
+            token: _,
+            instance,
+            member,
+        } => eval_member_expression(eval(*instance, env)?, *member),
     }
 }
 
@@ -371,6 +376,34 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
     Ok(args)
 }
 
+fn eval_member_expression(instance: Object, right: Node) -> Result<Object, String> {
+    let mut env = instance.associated_env();
+    let right = if let Node::CallExpression {
+        token,
+        function,
+        mut arguments,
+    } = right
+    {
+        let self_token = Token::this();
+        arguments.insert(
+            0,
+            Node::Identifier {
+                token: self_token.clone(),
+                value: self_token.literal,
+            },
+        );
+
+        Node::CallExpression {
+            token,
+            function,
+            arguments,
+        }
+    } else {
+        right
+    };
+    eval(right, &mut env)
+}
+
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
     match function {
         Object::Function {
@@ -430,9 +463,10 @@ mod evaluator_test {
         🫷
         🅰️ ⬅️ 🈯🌜1️⃣🦶 3️⃣🌛
         🅰️ ⬅️ 👉🅰️🦶 1️⃣🦶 3️⃣👈
-        🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️👉3️⃣ ➖ 3️⃣👈🌛
-        🅱️ ⬅️ 🅰️👉3️⃣ ➖ 3️⃣👈
-        🫸 🗨️🅰️💬 ➡️ 1️⃣🦶 🅱️ ➡️ 9️⃣ 🫷👉🗨️🅰️💬👈
+        🅰️ ⬅️ 🅰️👉3️⃣ ➖ 3️⃣👈
+        🅱️ ⬅️ 🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️🌛
+        🅱️ ⬅️ 🫸 🅱️ ➡️ 🅰️🦶 🗨️9️⃣💬 ➡️ 9️⃣ 🫷👉🅱️👈
+        🅱️❇️💕🌜3️⃣🌛
         ",
         );
 
@@ -443,6 +477,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(1));
+        assert_eq!(evaluated.unwrap(), Object::Integer(125));
     }
 }

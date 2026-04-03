@@ -131,15 +131,10 @@ pub enum Node {
         function: Box<Node>,
         arguments: Vec<Node>,
     },
-    FieldExpression {
+    MemberExpression {
         token: Token,
         instance: Box<Node>,
-        field: Box<Node>,
-    },
-    MethodCallExpression {
-        token: Token,
-        instance: Box<Node>,
-        method: Box<Node>,
+        member: Box<Node>,
     },
 }
 
@@ -199,15 +194,10 @@ impl Node {
                 function: _,
                 arguments: _,
             } => &token.literal,
-            Node::FieldExpression {
+            Node::MemberExpression {
                 token,
                 instance: _,
-                field: _
-            } => &token.literal,
-            Node::MethodCallExpression {
-                token,
-                instance: _,
-                method: _
+                member: _
             } => &token.literal,
         }
     }
@@ -320,23 +310,14 @@ impl Node {
                     .collect::<Vec<String>>()
                     .join("🦶 "),
             ),
-            Node::FieldExpression {
+            Node::MemberExpression {
                 token: _,
                 instance,
-                field,
+                member,
             } => format!(
                 "{}❇️{}",
                 instance.string(),
-                field.string(),
-            ),
-            Node::MethodCallExpression {
-                token: _,
-                instance,
-                method,
-            } => format!(
-                "{}❇️{}",
-                instance.string(),
-                method.string(),
+                member.string(),
             ),
         }
     }

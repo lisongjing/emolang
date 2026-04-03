@@ -71,7 +71,7 @@ impl Object {
     }
 
     pub fn associated_env(&self) -> Environment {
-        match self {
+        let mut env = match self {
             Object::Integer(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
             Object::Float(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
             Object::Boolean(_) => todo!(),
@@ -79,7 +79,9 @@ impl Object {
             Object::List(_) => todo!(),
             Object::Map(_) => todo!(),
             _ => Environment::new_empty(),
-        }
+        };
+        env.set("❇️".to_string(), self.clone());
+        env
     }
 }
 
@@ -282,8 +284,9 @@ impl BuiltinFunction {
             return Err(format!("Expected 2 argument(s), but got {}", args.len()));
         }
 
-        let base = args.iter().next().unwrap();
-        let exp = args.iter().next().unwrap();
+        let mut iterator = args.iter();
+        let base = iterator.next().unwrap();
+        let exp = iterator.next().unwrap();
 
         match base {
             Object::Integer(base) => match exp {

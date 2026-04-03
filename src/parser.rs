@@ -134,6 +134,10 @@ impl Parser {
             TokenType::LParenthesis,
             Rc::new(|p, left| p.parse_call_expression(left)),
         );
+        self.infix_exp_parsers.insert(
+            TokenType::Member,
+            Rc::new(|p, left| p.parse_member_expression(left)),
+        );
     }
 
     pub fn parse_program(&mut self) -> Node {
@@ -604,6 +608,14 @@ impl Parser {
             function: Box::new(function),
             arguments,
         })
+    }
+
+    fn parse_member_expression(&mut self, instance: Node) -> Result<Node, String> {
+        let token = self.tokens.current().unwrap().clone();
+        self.tokens.to_next();
+        let member = Box::new(self.parse_expression(Precedence::Lowest)?);
+
+        Ok(Node::MemberExpression { token, instance: Box::new(instance), member })
     }
 }
 

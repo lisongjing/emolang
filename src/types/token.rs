@@ -80,4 +80,8 @@ impl Token {
     pub fn start() -> Token {
         Token::from(TokenType::Start, String::new())
     }
+
+    pub fn this() -> Token {
+        Token::from(TokenType::Identifier, String::from("❇️"))
+    }
 }
