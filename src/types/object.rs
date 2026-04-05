@@ -5,6 +5,7 @@ use std::{
 };
 
 use ordered_float::OrderedFloat;
+use unicode_segmentation::UnicodeSegmentation;
 
 use crate::{types::Node, util::emoji_convert::object_to_emoji};
 
@@ -74,10 +75,9 @@ impl Object {
         let mut env = match self {
             Object::Integer(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
             Object::Float(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
-            Object::Boolean(_) => todo!(),
-            Object::String(_) => todo!(),
-            Object::List(_) => todo!(),
-            Object::Map(_) => todo!(),
+            Object::String(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
+            Object::List(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
+            Object::Map(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
             _ => Environment::new_empty(),
         };
         env.set("🈯".to_string(), self.clone());
@@ -208,6 +208,7 @@ pub enum BuiltinFunction {
     Println,
 
     Pow,
+    Len,
 }
 
 impl BuiltinFunction {
@@ -224,6 +225,7 @@ impl BuiltinFunction {
             BuiltinFunction::Println => String::from("🖨️↩️"),
 
             BuiltinFunction::Pow => String::from("💕"),
+            BuiltinFunction::Len => String::from("📏"),
         }
     }
 
@@ -234,6 +236,7 @@ impl BuiltinFunction {
             BuiltinFunction::Println => Arc::new(BuiltinFunction::println) as FunctionWrapper,
 
             BuiltinFunction::Pow => Arc::new(BuiltinFunction::pow) as FunctionWrapper,
+            BuiltinFunction::Len => Arc::new(BuiltinFunction::len) as FunctionWrapper,
         }
     }
 
@@ -319,5 +322,22 @@ impl BuiltinFunction {
                 base.inspect()
             )),
         }
+    }
+
+    fn len(args: &[Object]) -> Result<Object, String> {
+        if args.len() != 1 {
+            return Err(format!("Expected 1 argument(s), but got {}", args.len()));
+        }
+
+        let length = match args.first().unwrap() {
+            Object::String(value) => value.graphemes(true).count(),
+            Object::List(value) => value.len(),
+            Object::Map(value) => value.len(),
+            object => return Err(format!("Expected string/list/map as instance, but got {:?}", object))
+        };
+
+        i64::try_from(length)
+            .map(Object::Integer)
+            .map_err(|_| String::from("Calculation overflow: len()"))
     }
 }
