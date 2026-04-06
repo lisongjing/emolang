@@ -612,10 +612,32 @@ impl Parser {
 
     fn parse_member_expression(&mut self, instance: Node) -> Result<Node, String> {
         let token = self.tokens.current().unwrap().clone();
-        self.tokens.to_next();
-        let member = Box::new(self.parse_expression(Precedence::Lowest)?);
+        let member = if let Some(token) = self.tokens.to_next() {
+            if token.token_type == TokenType::Identifier {
+                let identifier = Node::Identifier {
+                    token: token.clone(),
+                    value: token.literal.clone(),
+                };
+                if self.tokens.is_next_match(|tok| tok.token_type == TokenType::LParenthesis) {
+                    // method
+                    self.tokens.to_next();
+                    self.parse_call_expression(identifier)?
+                } else if self.tokens.is_next_match(|tok| tok.token_type == TokenType::LBracket) {
+                    // index expression
+                    self.tokens.to_next();
+                    self.parse_index_expression(identifier)?
+                } else {
+                    // field
+                    identifier
+                }
+            } else {
+                return Err(format!("Expected a identifier, but got a {}", token.literal))
+            }
+        } else {
+            return Err(String::from("Expected a identifier, but arrived at the end"))
+        };
 
-        Ok(Node::MemberExpression { token, instance: Box::new(instance), member })
+        Ok(Node::MemberExpression { token, instance: Box::new(instance), member: Box::new(member) })
     }
 }
 

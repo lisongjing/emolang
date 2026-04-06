@@ -466,7 +466,7 @@ mod evaluator_test {
         🅰️ ⬅️ 🅰️👉3️⃣ ➖ 3️⃣👈
         🅱️ ⬅️ 🗨️🅰️ 🟰 💬 ➕ 👁️‍🗨️🌜🅰️🌛
         🅱️ ⬅️ 🫸 🅱️ ➡️ 🅰️🦶 🗨️9️⃣💬 ➡️ 9️⃣ 🫷👉🅱️👈
-        🅱️❇️💕🌜3️⃣🌛
+        🅱️❇️💕🌜3️⃣🌛 ➖ 🗨️🅰️ 🟰 💬❇️📏🌜🌛
         ",
         );
 
@@ -477,6 +477,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(125));
+        assert_eq!(evaluated.unwrap(), Object::Integer(121));
     }
 }
