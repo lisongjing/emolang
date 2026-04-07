@@ -53,12 +53,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             token: _,
             name,
             value,
-        } => {
-            let value = eval(*value, env)?;
-            // todo assert name is identifier
-            env.set(name.string(), value.clone());
-            Ok(value)
-        }
+        } => eval_assign_statement(*name, *value, env),
         Node::Identifier { token: _, value } => eval_identifier(&value, env),
         Node::FunctionLiteral {
             token: _,
@@ -113,6 +108,61 @@ fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result
         }
     }
     result
+}
+
+fn eval_assign_statement(name: Node, value: Node, env: &mut Environment) -> Result<Object, String> {
+    let value_object = eval(value, env)?;
+    match name {
+        Node::Identifier { token: _, value } => {
+            env.set(value, value_object.clone());
+            Ok(value_object)
+        }
+        Node::IndexExpression {
+            token: _,
+            left,
+            index,
+        } => {
+            let left_object = eval(*left.clone(), env)?;
+            let index_object = eval(*index, env)?;
+            match left_object {
+                Object::List(mut elements) => {
+                    if let Object::Integer(index) = index_object
+                        && index >= 0
+                    {
+                        if let Some(element) = elements.get_mut(index as usize) {
+                            *element = value_object.clone();
+                            if let Node::Identifier { token: _, value } = *left {
+                                env.set(value, Object::List(elements));
+                            }
+                            Ok(value_object)
+                        } else {
+                            Err(format!("Invalid index: {index}"))
+                        }
+                    } else {
+                        Err(String::from(
+                            "Index must be an integer greater than or equal to 0",
+                        ))
+                    }
+                }
+                Object::Map(mut entries) => {
+                    if let Some(element) = entries.get_mut(&index_object) {
+                        *element = value_object.clone();
+                        if let Node::Identifier { token: _, value } = *left {
+                            env.set(value, Object::Map(entries));
+                        }
+                        Ok(value_object)
+                    } else {
+                        Err(format!("Invalid index: {index_object:?}"))
+                    }
+                }
+                _ => Err(String::from("Invalid collection type in index expression")),
+            }
+        }
+        _ => Err(format!(
+            "Expected identifier or index expression, but got {}",
+            name.string()
+        )),
+    }
 }
 
 fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Object, String> {
