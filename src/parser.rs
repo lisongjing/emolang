@@ -138,6 +138,10 @@ impl Parser {
             TokenType::Member,
             Rc::new(|p, left| p.parse_member_expression(left)),
         );
+        self.infix_exp_parsers.insert(
+            TokenType::Assign,
+            Rc::new(|p, left| p.parse_assign_expression(left)),
+        );
     }
 
     pub fn parse_program(&mut self) -> Node {
@@ -156,7 +160,6 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Result<Node, String> {
         match self.tokens.current().unwrap().token_type {
-            TokenType::Identifier => self.parse_assign_statement(),
             TokenType::Return => self.parse_return_statement(),
             TokenType::Semicolon => {
                 self.tokens.to_next();
@@ -164,37 +167,6 @@ impl Parser {
             },
             _ => self.parse_expression_statement(),
         }
-    }
-
-    fn parse_assign_statement(&mut self) -> Result<Node, String> {
-        if self
-            .tokens
-            .is_next_match(|tok| tok.token_type != TokenType::Assign)
-        {
-            return self.parse_expression_statement();
-        }
-
-        let identifier = self.tokens.current().unwrap().clone();
-        let name = Box::new(Node::Identifier {
-            token: identifier.clone(),
-            value: identifier.literal,
-        });
-        let assign_token = self.tokens.to_next().unwrap().clone();
-
-        self.tokens.to_next();
-        let value = Box::new(self.parse_expression(Precedence::Lowest)?);
-        while self
-            .tokens
-            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
-        {
-            self.tokens.to_next();
-        }
-
-        Ok(Node::AssignStatement {
-            token: assign_token,
-            name,
-            value,
-        })
     }
 
     fn parse_return_statement(&mut self) -> Result<Node, String> {
@@ -440,6 +412,18 @@ impl Parser {
             left: Box::new(left),
             operator,
             right,
+        })
+    }
+
+    fn parse_assign_expression(&mut self, identifier: Node) -> Result<Node, String> {
+        let token = self.tokens.current().unwrap().clone();
+        self.tokens.to_next();
+        let value = Box::new(self.parse_expression(Precedence::Lowest)?);
+
+        Ok(Node::AssignExpression {
+            token,
+            identifier: Box::new(identifier),
+            value
         })
     }
 

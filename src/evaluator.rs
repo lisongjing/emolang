@@ -49,11 +49,11 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::ReturnStatement { token: _, value } => {
             Ok(Object::ReturnValue(Box::new(eval(*value, env)?)))
         }
-        Node::AssignStatement {
+        Node::AssignExpression {
             token: _,
-            name,
+            identifier,
             value,
-        } => eval_assign_statement(*name, *value, env),
+        } => eval_assign_expression(*identifier, *value, env),
         Node::Identifier { token: _, value } => eval_identifier(&value, env),
         Node::FunctionLiteral {
             token: _,
@@ -110,9 +110,13 @@ fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result
     result
 }
 
-fn eval_assign_statement(name: Node, value: Node, env: &mut Environment) -> Result<Object, String> {
+fn eval_assign_expression(
+    identifier: Node,
+    value: Node,
+    env: &mut Environment,
+) -> Result<Object, String> {
     let value_object = eval(value, env)?;
-    match name {
+    match identifier {
         Node::Identifier { token: _, value } => {
             env.set(value, value_object.clone());
             Ok(value_object)
@@ -160,7 +164,7 @@ fn eval_assign_statement(name: Node, value: Node, env: &mut Environment) -> Resu
         }
         _ => Err(format!(
             "Expected identifier or index expression, but got {}",
-            name.string()
+            identifier.string()
         )),
     }
 }

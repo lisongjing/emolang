@@ -6,6 +6,7 @@ use crate::{
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Precedence {
     Lowest,
+    Assign,      // ⬅️
     Or,          // 🔀
     And,         // 🔁
     Equals,      // 🟰/❗🟰
@@ -20,6 +21,7 @@ pub enum Precedence {
 impl Precedence {
     pub fn get_operator_precedence(token: &Token) -> Precedence {
         match token.token_type {
+            TokenType::Assign => Precedence::Assign,
             TokenType::Or => Precedence::Or,
             TokenType::And => Precedence::And,
             TokenType::Equal => Precedence::Equals,
@@ -47,11 +49,6 @@ pub enum Node {
         statements: Vec<Node>,
     },
     // Statement
-    AssignStatement {
-        token: Token,
-        name: Box<Node>,
-        value: Box<Node>,
-    },
     ReturnStatement {
         token: Token,
         value: Box<Node>,
@@ -104,6 +101,11 @@ pub enum Node {
         operator: String,
         right: Box<Node>,
     },
+    AssignExpression {
+        token: Token,
+        identifier: Box<Node>,
+        value: Box<Node>,
+    },
     IndexExpression {
         token: Token,
         left: Box<Node>,
@@ -145,7 +147,6 @@ impl Node {
                 .first()
                 .map(|stmt| stmt.token_literal())
                 .unwrap_or_default(),
-            Node::AssignStatement { token, name: _, value: _ } => &token.literal,
             Node::ReturnStatement { token, value: _ } => &token.literal,
             Node::ExpressionStatement { token, expression: _ } => &token.literal,
             Node::BlockStatement { token, statements: _ } => &token.literal,
@@ -167,10 +168,15 @@ impl Node {
                 operator: _,
                 right: _,
             } => &token.literal,
+            Node::AssignExpression {
+                token,
+                identifier: _,
+                value: _,
+            } => &token.literal,
             Node::IndexExpression {
                 token,
                 left: _,
-                index: _
+                index: _,
             } => &token.literal,
             Node::IfExpression {
                 token,
@@ -205,9 +211,6 @@ impl Node {
     pub fn string(&self) -> String {
         match self {
             Node::Program { statements } => statements.iter().map(|stmt| stmt.string()).collect(),
-            Node::AssignStatement { token, name, value } => {
-                format!("{} {} {} ↙️", name.string(), token.literal, value.string())
-            }
             Node::ReturnStatement { token, value } => {
                 format!("{} {} ↙️", token.literal, value.string())
             }
@@ -254,6 +257,11 @@ impl Node {
                 operator,
                 right,
             } => format!("🌜{} {} {}🌛", left.string(), operator, right.string()),
+            Node::AssignExpression {
+                token,
+                identifier,
+                value
+            } => format!("{} {} {}", identifier.string(), token.literal, value.string()),
             Node::IndexExpression {
                 token: _,
                 left,
