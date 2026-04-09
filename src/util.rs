@@ -168,19 +168,19 @@ pub mod emoji_convert {
 
     pub fn object_to_emoji(object: &Object) -> Result<String, String> {
         let string = match object {
-            Object::Integer(value) => integer_to_emoji(value),
-            Object::Float(value) => float_to_emoji(value),
+            Object::Integer(value, _) => integer_to_emoji(value),
+            Object::Float(value, _) => float_to_emoji(value),
             Object::Boolean(value) => boolean_to_emoji(value),
-            Object::String(value) => value.clone(),
+            Object::String(value, _) => value.clone(),
             Object::Null => String::from(NULL_EMOJI),
-            Object::List(value) => {
+            Object::List(value, _) => {
                 let mut elements = vec![];
                 for element in value {
                     elements.push(object_to_emoji(element)?);
                 }
                 format!("👉{}👈", elements.join("🦶 "))
             },
-            Object::Map(value) => {
+            Object::Map(value, _) => {
                 let mut entries = vec![];
                 for (key, val) in value {
                     entries.push(format!("{} ➡️ {}", object_to_emoji(key)?, object_to_emoji(val)?));

@@ -9,10 +9,10 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             token: _,
             expression,
         } => eval(*expression, env),
-        Node::IntegerLiteral { token: _, value } => Ok(Object::Integer(value)),
-        Node::FloatLiteral { token: _, value } => Ok(Object::Float(value)),
-        Node::BooleanLiteral { token: _, value } => Ok(Object::Boolean(value)),
-        Node::StringLiteral { token: _, value } => Ok(Object::String(value)),
+        Node::IntegerLiteral { token: _, value } => Ok(Object::integer(value)),
+        Node::FloatLiteral { token: _, value } => Ok(Object::float(value)),
+        Node::BooleanLiteral { token: _, value } => Ok(Object::boolean(value)),
+        Node::StringLiteral { token: _, value } => Ok(Object::string(value)),
         Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
         Node::MapLiteral { token: _, entries } => eval_map_literal(entries, env),
         Node::PrefixExpression {
@@ -129,14 +129,14 @@ fn eval_assign_expression(
             let left_object = eval(*left.clone(), env)?;
             let index_object = eval(*index, env)?;
             match left_object {
-                Object::List(mut elements) => {
-                    if let Object::Integer(index) = index_object
+                Object::List(mut elements, _) => {
+                    if let Object::Integer(index, _) = index_object
                         && index >= 0
                     {
                         if let Some(element) = elements.get_mut(index as usize) {
                             *element = value_object.clone();
                             if let Node::Identifier { token: _, value } = *left {
-                                env.set(value, Object::List(elements));
+                                env.set(value, Object::list(elements));
                             }
                             Ok(value_object)
                         } else {
@@ -148,11 +148,11 @@ fn eval_assign_expression(
                         ))
                     }
                 }
-                Object::Map(mut entries) => {
+                Object::Map(mut entries, _) => {
                     if let Some(element) = entries.get_mut(&index_object) {
                         *element = value_object.clone();
                         if let Node::Identifier { token: _, value } = *left {
-                            env.set(value, Object::Map(entries));
+                            env.set(value, Object::map(entries));
                         }
                         Ok(value_object)
                     } else {
@@ -162,8 +162,24 @@ fn eval_assign_expression(
                 _ => Err(String::from("Invalid collection type in index expression")),
             }
         }
+        Node::MemberExpression {
+            token: _,
+            instance,
+            member,
+        } => {
+            let mut instance_object = eval(*instance.clone(), env)?;
+            if let Node::Identifier { token: _, value } = *member {
+                let mut env = instance_object.associated_env();
+                env.set(value, value_object.clone());
+                instance_object.set_associated_env(env);
+            }
+            if let Node::Identifier { token: _, value } = *instance {
+                env.set(value, instance_object);
+            }
+            Ok(value_object)
+        }
         _ => Err(format!(
-            "Expected identifier or index expression, but got {}",
+            "Expected identifier / index expression / member expression, but got {}",
             identifier.string()
         )),
     }
@@ -174,7 +190,7 @@ fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Objec
     for node in elements {
         value.push(eval(node, env)?);
     }
-    Ok(Object::List(value))
+    Ok(Object::list(value))
 }
 
 fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result<Object, String> {
@@ -182,7 +198,7 @@ fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result
     for (key, val) in entries {
         value.insert(eval(key, env)?, eval(val, env)?);
     }
-    Ok(Object::Map(value))
+    Ok(Object::map(value))
 }
 
 fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
@@ -202,12 +218,12 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
         ));
     }
     let value = match obj {
-        Object::Integer(value) => *value > 0,
-        Object::Float(value) => *value > 0.0,
+        Object::Integer(value, _) => *value > 0,
+        Object::Float(value, _) => *value > 0.0,
         Object::Boolean(value) => *value,
-        Object::String(value) => !value.is_empty(),
+        Object::String(value, _) => !value.is_empty(),
         Object::Null => false,
-        Object::List(value) => !value.is_empty(),
+        Object::List(value, _) => !value.is_empty(),
         _ => false,
     };
     Ok(to_bool_object(!value))
@@ -215,8 +231,8 @@ fn eval_prefix_not_expression(obj: &Object) -> Result<Object, String> {
 
 fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
     match obj {
-        Object::Integer(value) => Ok(Object::Integer(-value)),
-        Object::Float(value) => Ok(Object::Float(-value)),
+        Object::Integer(value, _) => Ok(Object::integer(-value)),
+        Object::Float(value, _) => Ok(Object::float(-value)),
         _ => Err(String::from(
             "Invalid prefix minus expression to evaluate non-numeric value",
         )),
@@ -224,32 +240,32 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
 }
 
 fn eval_infix_expression(operator: String, left: Object, right: Object) -> Result<Object, String> {
-    if let Object::Integer(left) = left
-        && let Object::Integer(right) = right
+    if let Object::Integer(left, _) = left
+        && let Object::Integer(right, _) = right
     {
         eval_integer_infix_expression(operator, left, right)
-    } else if let Object::Integer(left) = left
-        && let Object::Float(right) = right
+    } else if let Object::Integer(left, _) = left
+        && let Object::Float(right, _) = right
     {
         eval_float_infix_expression(operator, left as f64, right)
-    } else if let Object::Float(left) = left
-        && let Object::Float(right) = right
+    } else if let Object::Float(left, _) = left
+        && let Object::Float(right, _) = right
     {
         eval_float_infix_expression(operator, left, right)
-    } else if let Object::Float(left) = left
-        && let Object::Integer(right) = right
+    } else if let Object::Float(left, _) = left
+        && let Object::Integer(right, _) = right
     {
         eval_float_infix_expression(operator, left, right as f64)
     } else if let Object::Boolean(left) = left
         && let Object::Boolean(right) = right
     {
         eval_boolean_infix_expression(operator, left, right)
-    } else if let Object::String(ref left) = left
-        && let Object::String(ref right) = right
+    } else if let Object::String(ref left, _) = left
+        && let Object::String(ref right, _) = right
     {
         eval_string_infix_expression(operator, left, right)
-    } else if let Object::List(ref left) = left
-        && let Object::List(ref right) = right
+    } else if let Object::List(ref left, _) = left
+        && let Object::List(ref right, _) = right
     {
         eval_list_infix_expression(operator, left, right)
     } else if operator == "🟰" {
@@ -270,11 +286,11 @@ fn eval_integer_infix_expression(
     right: i64,
 ) -> Result<Object, String> {
     match operator.as_str() {
-        "➕" => Ok(Object::Integer(left + right)),
-        "➖" => Ok(Object::Integer(left - right)),
-        "✖️" => Ok(Object::Integer(left * right)),
-        "➗" => Ok(Object::Integer(left / right)),
-        "〰️" => Ok(Object::Integer(left % right)),
+        "➕" => Ok(Object::integer(left + right)),
+        "➖" => Ok(Object::integer(left - right)),
+        "✖️" => Ok(Object::integer(left * right)),
+        "➗" => Ok(Object::integer(left / right)),
+        "〰️" => Ok(Object::integer(left % right)),
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
         "▶️" => Ok(to_bool_object(left > right)),
@@ -287,11 +303,11 @@ fn eval_integer_infix_expression(
 
 fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Result<Object, String> {
     match operator.as_str() {
-        "➕" => Ok(Object::Float(left + right)),
-        "➖" => Ok(Object::Float(left - right)),
-        "✖️" => Ok(Object::Float(left * right)),
-        "➗" => Ok(Object::Float(left / right)),
-        "〰️" => Ok(Object::Float(left % right)),
+        "➕" => Ok(Object::float(left + right)),
+        "➖" => Ok(Object::float(left - right)),
+        "✖️" => Ok(Object::float(left * right)),
+        "➗" => Ok(Object::float(left / right)),
+        "〰️" => Ok(Object::float(left % right)),
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
         "▶️" => Ok(to_bool_object(left > right)),
@@ -325,7 +341,7 @@ fn eval_string_infix_expression(
         "➕" => {
             let mut join = String::from(left);
             join.push_str(right);
-            Ok(Object::String(join))
+            Ok(Object::string(join))
         }
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
@@ -342,7 +358,7 @@ fn eval_list_infix_expression(
         "➕" => {
             let mut union = left.clone();
             union.extend_from_slice(right);
-            Ok(Object::List(union))
+            Ok(Object::list(union))
         }
         "➖" => {
             let difference = left
@@ -350,7 +366,7 @@ fn eval_list_infix_expression(
                 .into_iter()
                 .filter(|x| !right.contains(x))
                 .collect::<Vec<Object>>();
-            Ok(Object::List(difference))
+            Ok(Object::list(difference))
         }
         "🟰" => Ok(to_bool_object(left == right)),
         "❗🟰" => Ok(to_bool_object(left != right)),
@@ -360,8 +376,8 @@ fn eval_list_infix_expression(
 
 fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> {
     match left {
-        Object::List(elements) => {
-            if let Object::Integer(index) = index
+        Object::List(elements, _) => {
+            if let Object::Integer(index, _) = index
                 && index >= 0
             {
                 elements
@@ -374,7 +390,7 @@ fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> 
                 ))
             }
         }
-        Object::Map(entries) => entries
+        Object::Map(entries, _) => entries
             .get(&index)
             .cloned()
             .ok_or_else(|| format!("Invalid index: {index:?}")),
@@ -531,6 +547,6 @@ mod evaluator_test {
         let evaluated = eval(program, &mut env);
 
         assert!(evaluated.is_ok());
-        assert_eq!(evaluated.unwrap(), Object::Integer(121));
+        assert_eq!(evaluated.unwrap(), Object::integer(121));
     }
 }

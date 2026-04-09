@@ -11,13 +11,13 @@ use crate::{types::Node, util::emoji_convert::object_to_emoji};
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum Object {
-    Integer(i64),
-    Float(f64),
+    Integer(i64, Environment),
+    Float(f64, Environment),
     Boolean(bool),
-    String(String),
+    String(String, Environment),
     Null,
-    List(Vec<Object>),
-    Map(HashMap<Object, Object>),
+    List(Vec<Object>, Environment),
+    Map(HashMap<Object, Object>, Environment),
     ReturnValue(Box<Object>),
     Function {
         parameters: Vec<Node>,
@@ -28,14 +28,43 @@ pub enum Object {
 }
 
 impl Object {
+    pub fn integer(value: i64) -> Object {
+        Object::Integer(value, Environment::new_builtins(&[BuiltinFunction::Pow]))
+    }
+
+    pub fn float(value: f64) -> Object {
+        Object::Float(value, Environment::new_builtins(&[BuiltinFunction::Pow]))
+    }
+
+    pub fn boolean(value: bool) -> Object {
+        if value {TRUE} else {FALSE}
+    }
+
+    pub fn string(value: String) -> Object {
+        Object::String(value, Environment::new_builtins(&[BuiltinFunction::Len]))
+    }
+
+    pub fn null() -> Object {
+        NULL
+    }
+
+    pub fn list(value: Vec<Object>) -> Object {
+        Object::List(value, Environment::new_builtins(&[BuiltinFunction::Len]))
+    }
+
+    pub fn map(value: HashMap<Object, Object>) -> Object {
+        Object::Map(value, Environment::new_builtins(&[BuiltinFunction::Len]))
+    }
+
+
     pub fn inspect(&self) -> String {
         match self {
-            Object::Integer(value) => value.to_string(),
-            Object::Float(value) => value.to_string(),
+            Object::Integer(value, _) => value.to_string(),
+            Object::Float(value, _) => value.to_string(),
             Object::Boolean(value) => value.to_string(),
-            Object::String(value) => format!("\"{}\"", value),
+            Object::String(value, _) => format!("\"{}\"", value),
             Object::Null => "null".to_string(),
-            Object::List(value) => format!(
+            Object::List(value, _) => format!(
                 "[{}]",
                 value
                     .iter()
@@ -43,7 +72,7 @@ impl Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Object::Map(value) => format!(
+            Object::Map(value, _) => format!(
                 "{{{}}}",
                 value
                     .iter()
@@ -73,26 +102,37 @@ impl Object {
 
     pub fn associated_env(&self) -> Environment {
         let mut env = match self {
-            Object::Integer(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
-            Object::Float(_) => Environment::new_builtins(&[BuiltinFunction::Pow]),
-            Object::String(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
-            Object::List(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
-            Object::Map(_) => Environment::new_builtins(&[BuiltinFunction::Len]),
-            _ => Environment::new_empty(),
+            Object::Integer(_, env) => env.clone(),
+            Object::Float(_, env) => env.clone(),
+            Object::String(_, env) => env.clone(),
+            Object::List(_, env) => env.clone(),
+            Object::Map(_, env) => env.clone(),
+            _ => Environment::new_builtins(&[]),
         };
         env.set("🈯".to_string(), self.clone());
         env
+    }
+
+    pub fn set_associated_env(&mut self, env: Environment) {
+        match self {
+            Object::Integer(_, e) => *e = env,
+            Object::Float(_, e) => *e = env,
+            Object::String(_, e) => *e = env,
+            Object::List(_, e) => *e = env,
+            Object::Map(_, e) => *e = env,
+            _ => (),
+        }
     }
 }
 
 impl Hash for Object {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
-            Object::Integer(value) => {
+            Object::Integer(value, _) => {
                 0u32.hash(state);
                 value.hash(state);
             }
-            Object::Float(value) => {
+            Object::Float(value, _) => {
                 1u32.hash(state);
                 OrderedFloat(*value).hash(state);
             }
@@ -100,20 +140,20 @@ impl Hash for Object {
                 2u32.hash(state);
                 value.hash(state);
             }
-            Object::String(value) => {
+            Object::String(value, _) => {
                 3u32.hash(state);
                 value.hash(state);
             }
             Object::Null => {
                 4u32.hash(state);
             }
-            Object::List(elements) => {
+            Object::List(elements, _) => {
                 5u32.hash(state);
                 for element in elements {
                     element.hash(state);
                 }
             }
-            Object::Map(entries) => {
+            Object::Map(entries, _) => {
                 6u32.hash(state);
                 for (key, value) in entries {
                     key.hash(state);
@@ -154,13 +194,6 @@ pub struct Environment {
 }
 
 impl Environment {
-    pub fn new_empty() -> Self {
-        Environment {
-            map: HashMap::new(),
-            outer: None,
-        }
-    }
-
     pub fn new_default() -> Self {
         let mut map = HashMap::new();
 
@@ -263,18 +296,18 @@ impl BuiltinFunction {
             return Err(format!("Expected 1 argument(s), but got {}", args.len()));
         }
 
-        object_to_emoji(args.first().unwrap()).map(Object::String)
+        object_to_emoji(args.first().unwrap()).map(Object::string)
     }
 
     fn print(args: &[Object]) -> Result<Object, String> {
-        if let Object::String(string) = BuiltinFunction::to_string(args)? {
+        if let Object::String(string, _) = BuiltinFunction::to_string(args)? {
             print!("{string}");
         }
         Ok(Object::Null)
     }
 
     fn println(args: &[Object]) -> Result<Object, String> {
-        if let Object::String(string) = BuiltinFunction::to_string(args)? {
+        if let Object::String(string, _) = BuiltinFunction::to_string(args)? {
             println!("{string}");
         }
         Ok(Object::Null)
@@ -292,12 +325,12 @@ impl BuiltinFunction {
         let exp = iterator.next().unwrap();
 
         match base {
-            Object::Integer(base) => match exp {
-                Object::Integer(exp) if u32::try_from(*exp).is_ok() => base
+            Object::Integer(base, _) => match exp {
+                Object::Integer(exp, _) if u32::try_from(*exp).is_ok() => base
                     .checked_pow(*exp as u32)
-                    .map(Object::Integer)
+                    .map(Object::integer)
                     .ok_or_else(|| format!("Calculation overflow: {}.pow({})", base, exp)),
-                Object::Float(exp) => Ok(Object::Float((*base as f64).powf(*exp))),
+                Object::Float(exp, _) => Ok(Object::float((*base as f64).powf(*exp))),
                 _ => Err(format!(
                     "Pow exponent must be Integer in {}~{} or Float: {}",
                     u32::MIN,
@@ -305,11 +338,11 @@ impl BuiltinFunction {
                     exp.inspect()
                 )),
             },
-            Object::Float(base) => match exp {
-                Object::Integer(exp) if i32::try_from(*exp).is_ok() => {
-                    Ok(Object::Float(base.powi(*exp as i32)))
+            Object::Float(base, _) => match exp {
+                Object::Integer(exp, _) if i32::try_from(*exp).is_ok() => {
+                    Ok(Object::float(base.powi(*exp as i32)))
                 }
-                Object::Float(exp) => Ok(Object::Float(base.powf(*exp))),
+                Object::Float(exp, _) => Ok(Object::float(base.powf(*exp))),
                 _ => Err(format!(
                     "Pow exponent must be Integer in {}~{} or Float: {}",
                     i32::MIN,
@@ -330,14 +363,14 @@ impl BuiltinFunction {
         }
 
         let length = match args.first().unwrap() {
-            Object::String(value) => value.graphemes(true).count(),
-            Object::List(value) => value.len(),
-            Object::Map(value) => value.len(),
+            Object::String(value, _) => value.graphemes(true).count(),
+            Object::List(value, _) => value.len(),
+            Object::Map(value, _) => value.len(),
             object => return Err(format!("Expected string/list/map as instance, but got {:?}", object))
         };
 
         i64::try_from(length)
-            .map(Object::Integer)
+            .map(Object::integer)
             .map_err(|_| String::from("Calculation overflow: len()"))
     }
 }
