@@ -170,8 +170,6 @@ impl Parser {
     }
 
     fn parse_return_statement(&mut self) -> Result<Node, String> {
-        let return_token = self.tokens.current().unwrap().clone();
-
         self.tokens.to_next();
         let value = Box::new(self.parse_expression(Precedence::Lowest)?);
         while self
@@ -182,13 +180,11 @@ impl Parser {
         }
 
         Ok(Node::ReturnStatement {
-            token: return_token,
             value,
         })
     }
 
     fn parse_expression_statement(&mut self) -> Result<Node, String> {
-        let exp_token = self.tokens.current().unwrap().clone();
         let expression = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         while self
@@ -199,13 +195,11 @@ impl Parser {
         }
 
         Ok(Node::ExpressionStatement {
-            token: exp_token,
             expression,
         })
     }
 
     fn parse_block_statement(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let mut statements = vec![];
 
         self.tokens.to_next();
@@ -220,7 +214,7 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Node::BlockStatement { token, statements })
+        Ok(Node::BlockStatement { statements })
     }
 
     fn parse_expression(&mut self, precedence: Precedence) -> Result<Node, String> {
@@ -251,40 +245,48 @@ impl Parser {
     }
 
     fn parse_identifier(&self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
+        let token = self.tokens.current().unwrap();
         Ok(Node::Identifier {
-            token: token.clone(),
             value: token.literal.clone(),
         })
     }
 
     fn parse_integer_literal(&self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let value = token
+        let value = self
+            .tokens
+            .current()
+            .unwrap()
             .literal
             .parse()
             .map_err(|err: ParseIntError| err.to_string())?;
-        Ok(Node::IntegerLiteral { token, value })
+        Ok(Node::IntegerLiteral { value })
     }
 
     fn parse_float_literal(&self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let value = token
+        let value = self
+            .tokens
+            .current()
+            .unwrap()
             .literal
             .parse()
             .map_err(|err: ParseFloatError| err.to_string())?;
-        Ok(Node::FloatLiteral { token, value })
+        Ok(Node::FloatLiteral { value })
     }
 
     fn parse_bool_literal(&self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let value = token.token_type == TokenType::True;
-        Ok(Node::BooleanLiteral { token, value })
+        let value = TokenType::True == self
+            .tokens
+            .current()
+            .unwrap()
+            .token_type;
+        Ok(Node::BooleanLiteral { value })
     }
 
     fn parse_string_literal(&self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let mut value = token
+        let mut value = self
+            .tokens
+            .current()
+            .unwrap()
             .literal
             .clone()
             .replace("🪄↩️", "\n")
@@ -312,11 +314,10 @@ impl Parser {
             return Err(String::from("Expected 🗨️ or 💬 at the end of a string literal"));
         }
 
-        Ok(Node::StringLiteral { token, value })
+        Ok(Node::StringLiteral { value })
     }
 
     fn parse_list_literal(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let mut elements = vec![];
         while self
             .tokens
@@ -341,11 +342,10 @@ impl Parser {
                 return Err(format!("Expected a comma, but got a {}", token.literal));
             }
         }
-        Ok(Node::ListLiteral { token, elements })
+        Ok(Node::ListLiteral { elements })
     }
 
     fn parse_map_literal(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let mut entries = vec![];
         while self
             .tokens
@@ -359,7 +359,7 @@ impl Parser {
                 .tokens
                 .is_next_match(|token| token.token_type != TokenType::Describe)
             {
-                return Err(format!("Expected a ➡️, but got a {}", token.literal));
+                return Err(format!("Expected a ➡️ between the key and value"));
             }
             self.tokens.to_next();
             self.tokens.to_next();
@@ -383,16 +383,19 @@ impl Parser {
                 return Err(format!("Expected a comma, but got a {}", token.literal));
             }
         }
-        Ok(Node::MapLiteral { token, entries })
+        Ok(Node::MapLiteral { entries })
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let operator = token.literal.clone();
+        let operator = self
+            .tokens
+            .current()
+            .unwrap()
+            .literal
+            .clone();
         if self.tokens.to_next().is_some() {
             let right = Box::new(self.parse_expression(Precedence::Prefix)?);
             Ok(Node::PrefixExpression {
-                token,
                 operator,
                 right,
             })
@@ -402,13 +405,16 @@ impl Parser {
     }
 
     fn parse_infix_expression(&mut self, left: Node) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-        let operator = token.literal.clone();
+        let operator = self
+            .tokens
+            .current()
+            .unwrap()
+            .literal
+            .clone();
         let precedence = Precedence::get_operator_precedence(self.tokens.current().unwrap());
         self.tokens.to_next();
         let right = Box::new(self.parse_expression(precedence)?);
         Ok(Node::InfixExpression {
-            token,
             left: Box::new(left),
             operator,
             right,
@@ -416,12 +422,10 @@ impl Parser {
     }
 
     fn parse_assign_expression(&mut self, identifier: Node) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         self.tokens.to_next();
         let value = Box::new(self.parse_expression(Precedence::Lowest)?);
 
         Ok(Node::AssignExpression {
-            token,
             identifier: Box::new(identifier),
             value
         })
@@ -443,8 +447,6 @@ impl Parser {
     }
 
     fn parse_if_expression(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-
         self.tokens.to_next();
         let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
@@ -478,7 +480,6 @@ impl Parser {
         };
 
         Ok(Node::IfExpression {
-            token,
             condition,
             consequence,
             alternative,
@@ -486,8 +487,6 @@ impl Parser {
     }
 
     fn parse_while_expression(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
-
         self.tokens.to_next();
         let condition = Box::new(self.parse_expression(Precedence::Lowest)?);
 
@@ -504,14 +503,12 @@ impl Parser {
         let body = Box::new(self.parse_block_statement()?);
 
         Ok(Node::WhileExpression {
-            token,
             condition,
             body,
         })
     }
 
     fn parse_function_literal(&mut self) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let mut name = None;
         let mut parameters = vec![];
 
@@ -549,7 +546,6 @@ impl Parser {
         let body = Box::new(self.parse_block_statement()?);
 
         Ok(Node::FunctionLiteral {
-            token,
             name,
             parameters,
             body,
@@ -557,12 +553,10 @@ impl Parser {
     }
 
     fn parse_index_expression(&mut self, list: Node) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         self.tokens.to_next();
         let index = self.parse_expression(Precedence::Lowest)?;
         if let Some(tok) = self.tokens.to_next() && tok.token_type == TokenType::RBracket {
             Ok(Node::IndexExpression {
-                token,
                 left: Box::new(list),
                 index: Box::new(index),
             })
@@ -572,7 +566,6 @@ impl Parser {
     }
 
     fn parse_call_expression(&mut self, function: Node) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let mut arguments = vec![];
 
         while self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis).is_some() {
@@ -588,18 +581,15 @@ impl Parser {
         }
 
         Ok(Node::CallExpression {
-            token,
             function: Box::new(function),
             arguments,
         })
     }
 
     fn parse_member_expression(&mut self, instance: Node) -> Result<Node, String> {
-        let token = self.tokens.current().unwrap().clone();
         let member = if let Some(token) = self.tokens.to_next() {
             if token.token_type == TokenType::Identifier {
                 let identifier = Node::Identifier {
-                    token: token.clone(),
                     value: token.literal.clone(),
                 };
                 if self.tokens.is_next_match(|tok| tok.token_type == TokenType::LParenthesis) {
@@ -621,7 +611,7 @@ impl Parser {
             return Err(String::from("Expected a identifier, but arrived at the end"))
         };
 
-        Ok(Node::MemberExpression { token, instance: Box::new(instance), member: Box::new(member) })
+        Ok(Node::MemberExpression { instance: Box::new(instance), member: Box::new(member) })
     }
 }
 

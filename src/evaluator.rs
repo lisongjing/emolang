@@ -6,57 +6,48 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
         Node::Program { statements } => eval_program(statements, env),
         Node::ExpressionStatement {
-            token: _,
             expression,
         } => eval(*expression, env),
-        Node::IntegerLiteral { token: _, value } => Ok(Object::integer(value)),
-        Node::FloatLiteral { token: _, value } => Ok(Object::float(value)),
-        Node::BooleanLiteral { token: _, value } => Ok(Object::boolean(value)),
-        Node::StringLiteral { token: _, value } => Ok(Object::string(value)),
-        Node::ListLiteral { token: _, elements } => eval_list_literal(elements, env),
-        Node::MapLiteral { token: _, entries } => eval_map_literal(entries, env),
+        Node::IntegerLiteral { value } => Ok(Object::integer(value)),
+        Node::FloatLiteral { value } => Ok(Object::float(value)),
+        Node::BooleanLiteral { value } => Ok(Object::boolean(value)),
+        Node::StringLiteral { value } => Ok(Object::string(value)),
+        Node::ListLiteral { elements } => eval_list_literal(elements, env),
+        Node::MapLiteral { entries } => eval_map_literal(entries, env),
         Node::PrefixExpression {
-            token: _,
             operator,
             right,
         } => eval_prefix_expression(operator, eval(*right, env)?),
         Node::InfixExpression {
-            token: _,
             left,
             operator,
             right,
         } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::IndexExpression {
-            token: _,
             left,
             index,
         } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
         Node::BlockStatement {
-            token: _,
             statements,
         } => eval_block_statements(statements, env),
         Node::IfExpression {
-            token: _,
             condition,
             consequence,
             alternative,
         } => eval_if_expression(*condition, *consequence, alternative, env),
         Node::WhileExpression {
-            token: _,
             condition,
             body,
         } => eval_while_expression(*condition, *body, env),
-        Node::ReturnStatement { token: _, value } => {
+        Node::ReturnStatement { value } => {
             Ok(Object::ReturnValue(Box::new(eval(*value, env)?)))
         }
         Node::AssignExpression {
-            token: _,
             identifier,
             value,
         } => eval_assign_expression(*identifier, *value, env),
-        Node::Identifier { token: _, value } => eval_identifier(&value, env),
+        Node::Identifier { value } => eval_identifier(&value, env),
         Node::FunctionLiteral {
-            token: _,
             name,
             parameters,
             body,
@@ -72,7 +63,6 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             Ok(function)
         }
         Node::CallExpression {
-            token: _,
             function,
             arguments,
         } => {
@@ -81,7 +71,6 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             apply_function(function, args)
         }
         Node::MemberExpression {
-            token: _,
             instance,
             member,
         } => eval_member_expression(eval(*instance, env)?, *member),
@@ -117,12 +106,11 @@ fn eval_assign_expression(
 ) -> Result<Object, String> {
     let value_object = eval(value, env)?;
     match identifier {
-        Node::Identifier { token: _, value } => {
+        Node::Identifier { value } => {
             env.set(value, value_object.clone());
             Ok(value_object)
         }
         Node::IndexExpression {
-            token: _,
             left,
             index,
         } => {
@@ -135,7 +123,7 @@ fn eval_assign_expression(
                     {
                         if let Some(element) = elements.get_mut(index as usize) {
                             *element = value_object.clone();
-                            if let Node::Identifier { token: _, value } = *left {
+                            if let Node::Identifier { value } = *left {
                                 env.set(value, Object::list(elements));
                             }
                             Ok(value_object)
@@ -151,7 +139,7 @@ fn eval_assign_expression(
                 Object::Map(mut entries, _) => {
                     if let Some(element) = entries.get_mut(&index_object) {
                         *element = value_object.clone();
-                        if let Node::Identifier { token: _, value } = *left {
+                        if let Node::Identifier { value } = *left {
                             env.set(value, Object::map(entries));
                         }
                         Ok(value_object)
@@ -163,17 +151,16 @@ fn eval_assign_expression(
             }
         }
         Node::MemberExpression {
-            token: _,
             instance,
             member,
         } => {
             let mut instance_object = eval(*instance.clone(), env)?;
-            if let Node::Identifier { token: _, value } = *member {
+            if let Node::Identifier { value } = *member {
                 let mut env = instance_object.associated_env();
                 env.set(value, value_object.clone());
                 instance_object.set_associated_env(env);
             }
-            if let Node::Identifier { token: _, value } = *instance {
+            if let Node::Identifier { value } = *instance {
                 env.set(value, instance_object);
             }
             Ok(value_object)
@@ -449,7 +436,6 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
 fn eval_member_expression(instance: Object, right: Node) -> Result<Object, String> {
     let mut env = instance.associated_env();
     let right = if let Node::CallExpression {
-        token,
         function,
         mut arguments,
     } = right
@@ -458,13 +444,11 @@ fn eval_member_expression(instance: Object, right: Node) -> Result<Object, Strin
         arguments.insert(
             0,
             Node::Identifier {
-                token: self_token.clone(),
                 value: self_token.literal,
             },
         );
 
         Node::CallExpression {
-            token,
             function,
             arguments,
         }
@@ -490,7 +474,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
             }
             let mut env = Environment::new_enclosed(env);
             for (index, param) in parameters.iter().enumerate() {
-                if let Node::Identifier { token: _, value } = param {
+                if let Node::Identifier { value } = param {
                     env.set(value.clone(), args.get(index).unwrap().clone());
                 } else {
                     return Err(format!("Not a identifier: {}", param.string()));
