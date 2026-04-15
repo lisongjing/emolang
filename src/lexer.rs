@@ -54,6 +54,8 @@ impl<'a> Lexer<'a> {
                 "❓" => Token::from_str(TokenType::If, char),
                 "❗" => self.handle_two_chars_token(TokenType::Else, "🟰", TokenType::NotEqual),
                 "⭕" => Token::from_str(TokenType::While, char),
+                "🔜" => Token::from_str(TokenType::Continue, char),
+                "🔚" => Token::from_str(TokenType::Break, char),
                 "📛" => Token::from_str(TokenType::Function, char),
                 "🔙" => Token::from_str(TokenType::Return, char),
                 "➡️" => Token::from_str(TokenType::Describe, char),
@@ -71,7 +73,7 @@ impl<'a> Lexer<'a> {
                     if let Some(token) = self.handle_new_line(&tokens) {
                         token
                     } else {
-                        continue
+                        continue;
                     }
                 }
                 _ if SPACES.contains(char) => continue,
@@ -102,7 +104,10 @@ impl<'a> Lexer<'a> {
 
     fn handle_string(&mut self) -> Token {
         let mut literal = String::from(*self.chars.current().unwrap());
-        while self.chars.is_next_match(|char| !QUOTES.contains(char) || *self.chars.current().unwrap() == "🪄") {
+        while self
+            .chars
+            .is_next_match(|char| !QUOTES.contains(char) || *self.chars.current().unwrap() == "🪄")
+        {
             literal.push_str(self.chars.to_next().unwrap());
         }
         if self.chars.to_next().is_some() {
@@ -142,18 +147,20 @@ impl<'a> Lexer<'a> {
     }
 
     fn handle_new_line(&self, tokens: &StatefulVector<Token>) -> Option<Token> {
-        if tokens.last().is_some_and(|token| ![TokenType::Semicolon, TokenType::Start].contains(&token.token_type)) {
-            Some(Token::from_str(TokenType::Semicolon, self.chars.current().unwrap()))
+        if tokens.last().is_some_and(|token| {
+            ![TokenType::Semicolon, TokenType::Start].contains(&token.token_type)
+        }) {
+            Some(Token::from_str(
+                TokenType::Semicolon,
+                self.chars.current().unwrap(),
+            ))
         } else {
             None
         }
     }
 
     fn skip_comment(&mut self) {
-        while self
-            .chars
-            .is_next_match(|&char| !NEWLINES.contains(&char))
-        {
+        while self.chars.is_next_match(|&char| !NEWLINES.contains(&char)) {
             self.chars.to_next();
         }
     }
@@ -182,6 +189,7 @@ mod lexer_test {
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
             🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
             🅱️ ⬅️ 🅱️ ➖ 🅰️ ↙️
+            ❓ 🅰️ 🟰 5️⃣ 🫸 🔚 🫷
           🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
@@ -234,6 +242,14 @@ mod lexer_test {
             Token::from_str(TokenType::Minus, "➖"),
             Token::from_str(TokenType::Identifier, "🅰️"),
             Token::from_str(TokenType::Semicolon, "↙️"),
+            Token::from_str(TokenType::If, "❓"),
+            Token::from_str(TokenType::Identifier, "🅰️"),
+            Token::from_str(TokenType::Equal, "🟰"),
+            Token::from_str(TokenType::Integer, "5"),
+            Token::from_str(TokenType::LBrace, "🫸"),
+            Token::from_str(TokenType::Break, "🔚"),
+            Token::from_str(TokenType::RBrace, "🫷"),
+            Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::RBrace, "🫷"),
             Token::from_str(TokenType::Semicolon, "\n"),
             Token::from_str(TokenType::Return, "🔙"),
