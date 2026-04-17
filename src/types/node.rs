@@ -106,6 +106,9 @@ pub enum Node {
         condition: Box<Node>,
         body: Box<Node>,
     },
+    BreakExpression {
+        value: Option<Box<Node>>,
+    },
     FunctionLiteral {
         name: Option<Box<Node>>,
         parameters: Vec<Node>,
@@ -194,6 +197,9 @@ impl Node {
                 condition,
                 body,
             } => format!("⭕ {} {}", condition.string(), body.string(),),
+            Node::BreakExpression {
+                value
+            } => format!("🔚{}", value.as_ref().map_or(String::new(), |v| format!(" {}", v.string()))),
             Node::FunctionLiteral {
                 name,
                 parameters,

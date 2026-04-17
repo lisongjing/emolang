@@ -66,6 +66,8 @@ impl Parser {
         self.prefix_exp_parsers
             .insert(TokenType::While, Rc::new(|p| p.parse_while_expression()));
         self.prefix_exp_parsers
+            .insert(TokenType::Break, Rc::new(|p| p.parse_break_expression()));
+        self.prefix_exp_parsers
             .insert(TokenType::Function, Rc::new(|p| p.parse_function_literal()));
 
         self.prefix_exp_parsers.insert(
@@ -359,7 +361,7 @@ impl Parser {
                 .tokens
                 .is_next_match(|token| token.token_type != TokenType::Describe)
             {
-                return Err(format!("Expected a ➡️ between the key and value"));
+                return Err(String::from("Expected a ➡️ between the key and value"));
             }
             self.tokens.to_next();
             self.tokens.to_next();
@@ -508,6 +510,18 @@ impl Parser {
         })
     }
 
+    fn parse_break_expression(&mut self) -> Result<Node, String> {
+        let token = self.tokens.to_next();
+
+        let value = if token.is_some_and(|tok| tok.token_type != TokenType::Semicolon) {
+            Some(Box::new(self.parse_expression(Precedence::Lowest)?))
+        } else {
+            None
+        };
+
+        Ok(Node::BreakExpression { value })
+    }
+
     fn parse_function_literal(&mut self) -> Result<Node, String> {
         let mut name = None;
         let mut parameters = vec![];
@@ -629,6 +643,7 @@ mod parser_test {
           ⭕ 🅰️ ▶️🟰 0️⃣ 🔁 🅱️ ◀️🟰 5️⃣ 🫸
             🅰️ ⬅️ 🅰️ ➕ 🅱️ ↙️
             🅱️ ⬅️ 🅱️ ➖ 🅰️ ↙️
+            ❓ 🅰️ 🟰 5️⃣ 🫸 🔚 ↙️ 🫷
           🫷
           🔙 ❓ 🅰️ ▶️ 🅱️ 🫸🅰️🫷 ❗ 🫸🅱️🫷 ↙️
         🫷
@@ -642,7 +657,7 @@ mod parser_test {
         let target_statements = [
             "㊙️🔢 ⬅️ 🌜1️⃣ ➕ 🌜3️⃣⚪9️⃣ ✖️ 7️⃣2️⃣🌛🌛 ↙️",
             "㊙️🔡 ⬅️ 🗨️🈶🅰️🈚🅱️🈲🆎\n💬 ↙️",
-            "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
+            "📛 🈯 🌜🅰️🦶 🅱️🌛 🫸 ⭕ 🌜🌜🅰️ ▶️🟰 0️⃣🌛 🔁 🌜🅱️ ◀️🟰 5️⃣🌛🌛 🫸 🅰️ ⬅️ 🌜🅰️ ➕ 🅱️🌛 ↙️🅱️ ⬅️ 🌜🅱️ ➖ 🅰️🌛 ↙️❓ 🌜🅰️ 🟰 5️⃣🌛 🫸 🔚 ↙️ 🫷 ↙️ 🫷 ↙️🔙 ❓ 🌜🅰️ ▶️ 🅱️🌛 🫸 🅰️ ↙️ 🫷 ❗ 🫸 🅱️ ↙️ 🫷 ↙️ 🫷 ↙️",
             "🌜⏸️🌜❌ 🟰 🌜0️⃣ ◀️ 1️⃣🌛🌛🌛 ↙️",
             "🈯🌜🅰️🦶 🅱️🌛 ↙️",
             "👉🅰️🦶 🅱️👈👉0️⃣👈 ↙️",
