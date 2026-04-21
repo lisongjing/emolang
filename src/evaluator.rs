@@ -39,6 +39,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             condition,
             body,
         } => eval_while_expression(*condition, *body, env),
+        Node::BreakExpression {
+            value,
+        } => eval_break_expression(value, env),
         Node::ReturnStatement { value } => {
             Ok(Object::ReturnValue(Box::new(eval(*value, env)?)))
         }
@@ -409,6 +412,15 @@ fn eval_while_expression(
         eval(body.clone(), env)?;
     }
     Ok(NULL)
+}
+
+fn eval_break_expression(break_value: Option<Box<Node>>, env: &mut Environment) -> Result<Object, String> {
+    let value = if let Some(value) = break_value {
+        Some(Box::new(eval(*value, env)?))
+    } else {
+        None
+    };
+    Ok(Object::Break(value))
 }
 
 fn eval_condition(condition: Node, env: &mut Environment) -> Result<bool, String> {

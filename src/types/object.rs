@@ -18,13 +18,15 @@ pub enum Object {
     Null,
     List(Vec<Object>, Environment),
     Map(HashMap<Object, Object>, Environment),
-    ReturnValue(Box<Object>),
     Function {
         parameters: Vec<Node>,
         body: Box<Node>,
         env: Box<Environment>,
     },
     BuiltinFunction(BuiltinFunction),
+    ReturnValue(Box<Object>),
+    Break(Option<Box<Object>>),
+    Continue,
 }
 
 impl Object {
@@ -80,7 +82,6 @@ impl Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            Object::ReturnValue(value) => value.inspect(),
             Object::Function {
                 parameters,
                 body,
@@ -96,7 +97,10 @@ impl Object {
             ),
             Object::BuiltinFunction(function) => {
                 format!("{}(args...){{ //builtin implementation }}", function.name())
-            }
+            },
+            Object::ReturnValue(value) => value.inspect(),
+            Object::Break(value) => value.clone().map_or("!".to_string(), |v| v.inspect()),
+            Object::Continue => "!".to_string(),
         }
     }
 
@@ -160,21 +164,30 @@ impl Hash for Object {
                     value.hash(state);
                 }
             }
-            Object::ReturnValue(value) => {
-                7u32.hash(state);
-                value.hash(state);
-            }
             Object::Function {
                 parameters: _,
                 body,
                 env: _,
             } => {
-                8u32.hash(state);
+                7u32.hash(state);
                 body.string().hash(state);
             }
             Object::BuiltinFunction(value) => {
-                9u32.hash(state);
+                8u32.hash(state);
                 value.name().hash(state);
+            }
+            Object::ReturnValue(value) => {
+                9u32.hash(state);
+                value.hash(state);
+            }
+            Object::Break(value) => {
+                10u32.hash(state);
+                if let Some(val) = value {
+                    val.hash(state);
+                }
+            }
+            Object::Continue => {
+                11u32.hash(state);
             }
         }
     }
