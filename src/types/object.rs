@@ -226,6 +226,28 @@ impl Object {
             }
         )
     }
+
+    pub fn new_function(parameters: Vec<Node>, body: Box<Node>, env: Environment) -> Object {
+        Self::set_self_in_assoc_env(
+            Object {
+                value: ObjectValue::Function {
+                    parameters,
+                    body,
+                    env: Box::new(env),
+                },
+                associated_env: Environment::new_builtins(&[]),
+            }
+        )
+    }
+
+    pub fn new_return_value(value: Object) -> Object {
+        Self::set_self_in_assoc_env(
+            Object {
+                value: ObjectValue::ReturnValue(Box::new(value)),
+                associated_env: Environment::new_builtins(&[]),
+            }
+        )
+    }
 }
 
 
