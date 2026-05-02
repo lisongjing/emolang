@@ -5,50 +5,37 @@ use crate::types::{Node, Token, object::*};
 pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
     match node {
         Node::Program { statements } => eval_program(statements, env),
-        Node::ExpressionStatement {
-            expression,
-        } => eval(*expression, env),
+        Node::ExpressionStatement { expression } => eval(*expression, env),
         Node::IntegerLiteral { value } => Ok(Object::new_integer(value)),
         Node::FloatLiteral { value } => Ok(Object::new_float(value)),
         Node::BooleanLiteral { value } => Ok(Object::new_boolean(value)),
         Node::StringLiteral { value } => Ok(Object::new_string(value)),
         Node::ListLiteral { elements } => eval_list_literal(elements, env),
         Node::MapLiteral { entries } => eval_map_literal(entries, env),
-        Node::PrefixExpression {
-            operator,
-            right,
-        } => eval_prefix_expression(operator, eval(*right, env)?),
+        Node::PrefixExpression { operator, right } => {
+            eval_prefix_expression(operator, eval(*right, env)?)
+        }
         Node::InfixExpression {
             left,
             operator,
             right,
         } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
         Node::IndexExpression {
-            left,
+            collection: left,
             index,
         } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
-        Node::BlockStatement {
-            statements,
-        } => eval_block_statements(statements, env),
+        Node::BlockStatement { statements } => eval_block_statements(statements, env),
         Node::IfExpression {
             condition,
             consequence,
             alternative,
         } => eval_if_expression(*condition, *consequence, alternative, env),
-        Node::WhileExpression {
-            condition,
-            body,
-        } => eval_while_expression(*condition, *body, env),
-        Node::BreakExpression {
-            value,
-        } => eval_break_expression(value, env),
-        Node::ReturnStatement { value } => {
-            Ok(Object::new_return_value(eval(*value, env)?))
+        Node::WhileExpression { condition, body } => eval_while_expression(*condition, *body, env),
+        Node::BreakExpression { value } => eval_break_expression(value, env),
+        Node::ReturnStatement { value } => Ok(Object::new_return_value(eval(*value, env)?)),
+        Node::AssignExpression { identifier, value } => {
+            eval_assign_expression(*identifier, *value, env)
         }
-        Node::AssignExpression {
-            identifier,
-            value,
-        } => eval_assign_expression(*identifier, *value, env),
         Node::Identifier { value } => eval_identifier(&value, env),
         Node::FunctionLiteral {
             name,
@@ -69,10 +56,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             let args = eval_expressions(arguments, env)?;
             apply_function(function, args)
         }
-        Node::MemberExpression {
-            instance,
-            member,
-        } => eval_member_expression(eval(*instance, env)?, *member),
+        Node::MemberExpression { instance, member } => {
+            eval_member_expression(eval(*instance, env)?, *member)
+        }
     }
 }
 
@@ -80,7 +66,9 @@ fn eval_program(statements: Vec<Node>, env: &mut Environment) -> Result<Object, 
     let mut result = Err(String::from("Empty statements to evaluate values"));
     for statement in statements {
         result = eval(statement, env);
-        if let Ok(ref obj) = result && let ObjectValue::ReturnValue(value) = obj.value() {
+        if let Ok(ref obj) = result
+            && let ObjectValue::ReturnValue(value) = obj.value()
+        {
             return Ok(*value.clone());
         }
     }
@@ -91,7 +79,9 @@ fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result
     let mut result = Err(String::from("Empty statements to evaluate values"));
     for statement in statements {
         result = eval(statement, env);
-        if let Ok(ref obj) = result && let ObjectValue::ReturnValue(_) = obj.value() {
+        if let Ok(ref obj) = result
+            && let ObjectValue::ReturnValue(_) = obj.value()
+        {
             return result;
         }
     }
@@ -109,61 +99,58 @@ fn eval_assign_expression(
             env.set(value, value_object.clone());
             Ok(value_object)
         }
-        // Node::IndexExpression {
-        //     left,
-        //     index,
-        // } => {
-        //     let left_object = eval(*left.clone(), env)?;
-        //     let index_object = eval(*index, env)?;
-        //     match left_object.value() {
-        //         ObjectValue::List(mut elements) => {
-        //             if let ObjectValue::Integer(index) = index_object.value()
-        //                 && *index >= 0
-        //             {
-        //                 if let Some(element) = elements.get_mut(*index as usize) {
-        //                     *element = value_object.clone();
-        //                     if let Node::Identifier { value } = *left {
-        //                         env.set(value, Object::new_list(elements));
-        //                     }
-        //                     Ok(value_object)
-        //                 } else {
-        //                     Err(format!("Invalid index: {index}"))
-        //                 }
-        //             } else {
-        //                 Err(String::from(
-        //                     "Index must be an integer greater than or equal to 0",
-        //                 ))
-        //             }
-        //         }
-        //         ObjectValue::Map(mut entries) => {
-        //             if let Some(element) = entries.get_mut(&index_object) {
-        //                 *element = value_object.clone();
-        //                 if let Node::Identifier { value } = *left {
-        //                     env.set(value, Object::new_map(entries));
-        //                 }
-        //                 Ok(value_object)
-        //             } else {
-        //                 Err(format!("Invalid index: {index_object:?}"))
-        //             }
-        //         }
-        //         _ => Err(String::from("Invalid collection type in index expression")),
-        //     }
-        // }
-        // Node::MemberExpression {
-        //     instance,
-        //     member,
-        // } => {
-        //     let mut instance_object = eval(*instance.clone(), env)?;
-        //     if let Node::Identifier { value } = *member {
-        //         let mut env = instance_object.associated_env();
-        //         env.set(value, value_object.clone());
-        //         // instance_object.set_associated_env(env);
-        //     }
-        //     if let Node::Identifier { value } = *instance {
-        //         env.set(value, instance_object);
-        //     }
-        //     Ok(value_object)
-        // }
+        Node::IndexExpression {
+            collection: left,
+            index,
+        } => {
+            let mut collection_object = eval(*left.clone(), env)?;
+            let index_object = eval(*index, env)?;
+            match collection_object.value_mut() {
+                ObjectValue::List(elements) => {
+                    if let ObjectValue::Integer(index) = index_object.value()
+                        && *index >= 0
+                    {
+                        if let Some(element) = elements.get_mut(*index as usize) {
+                            *element = value_object.clone();
+                            if let Node::Identifier { value } = *left {
+                                env.set(value, Object::new_list(elements.to_owned()));
+                            }
+                            Ok(value_object)
+                        } else {
+                            Err(format!("Invalid index: {index}"))
+                        }
+                    } else {
+                        Err(String::from(
+                            "Index must be an integer greater than or equal to 0",
+                        ))
+                    }
+                }
+                ObjectValue::Map(entries) => {
+                    if let Some(element) = entries.get_mut(&index_object) {
+                        *element = value_object.clone();
+                        if let Node::Identifier { value } = *left {
+                            env.set(value, Object::new_map(entries.to_owned()));
+                        }
+                        Ok(value_object)
+                    } else {
+                        Err(format!("Invalid index: {index_object:?}"))
+                    }
+                }
+                _ => Err(String::from("Invalid collection type in index expression")),
+            }
+        }
+        Node::MemberExpression { instance, member } => {
+            let mut instance_object = eval(*instance.clone(), env)?;
+            if let Node::Identifier { value } = *member {
+                let env = instance_object.associated_env_mut();
+                env.set(value, value_object.clone());
+                // instance_object.set_associated_env(env);
+            }
+            if let Node::Identifier { value } = *instance {
+                env.set(value, instance_object);
+            }
+            Ok(value_object)
+        }
         _ => Err(format!(
             "Expected identifier / index expression / member expression, but got {}",
             identifier.string()
@@ -411,7 +398,10 @@ fn eval_while_expression(
     Ok(Object::new_null())
 }
 
-fn eval_break_expression(_break_value: Option<Box<Node>>, _env: &mut Environment) -> Result<Object, String> {
+fn eval_break_expression(
+    _break_value: Option<Box<Node>>,
+    _env: &mut Environment,
+) -> Result<Object, String> {
     // let value = if let Some(value) = break_value {
     //     Some(Box::new(eval(*value, env)?))
     // } else {

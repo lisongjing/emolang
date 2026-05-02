@@ -571,7 +571,7 @@ impl Parser {
         let index = self.parse_expression(Precedence::Lowest)?;
         if let Some(tok) = self.tokens.to_next() && tok.token_type == TokenType::RBracket {
             Ok(Node::IndexExpression {
-                left: Box::new(list),
+                collection: Box::new(list),
                 index: Box::new(index),
             })
         } else {

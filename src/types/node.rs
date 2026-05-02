@@ -94,7 +94,7 @@ pub enum Node {
         value: Box<Node>,
     },
     IndexExpression {
-        left: Box<Node>,
+        collection: Box<Node>,
         index: Box<Node>,
     },
     IfExpression {
@@ -162,22 +162,20 @@ impl Node {
                     .collect::<Vec<String>>()
                     .join("🦶 ")
             ),
-            Node::PrefixExpression {
-                operator,
-                right,
-            } => format!("🌜{}{}🌛", operator, right.string()),
+            Node::PrefixExpression { operator, right } => {
+                format!("🌜{}{}🌛", operator, right.string())
+            }
             Node::InfixExpression {
                 left,
                 operator,
                 right,
             } => format!("🌜{} {} {}🌛", left.string(), operator, right.string()),
-            Node::AssignExpression {
-                identifier,
-                value
-            } => format!("{} ⬅️ {}", identifier.string(), value.string()),
+            Node::AssignExpression { identifier, value } => {
+                format!("{} ⬅️ {}", identifier.string(), value.string())
+            }
             Node::IndexExpression {
-                left,
-                index
+                collection: left,
+                index,
             } => format!("{}👉{}👈", left.string(), index.string()),
             Node::IfExpression {
                 condition,
@@ -193,13 +191,15 @@ impl Node {
                     String::new()
                 }
             ),
-            Node::WhileExpression {
-                condition,
-                body,
-            } => format!("⭕ {} {}", condition.string(), body.string(),),
-            Node::BreakExpression {
+            Node::WhileExpression { condition, body } => {
+                format!("⭕ {} {}", condition.string(), body.string(),)
+            }
+            Node::BreakExpression { value } => format!(
+                "🔚{}",
                 value
-            } => format!("🔚{}", value.as_ref().map_or(String::new(), |v| format!(" {}", v.string()))),
+                    .as_ref()
+                    .map_or(String::new(), |v| format!(" {}", v.string()))
+            ),
             Node::FunctionLiteral {
                 name,
                 parameters,
@@ -227,14 +227,9 @@ impl Node {
                     .collect::<Vec<String>>()
                     .join("🦶 "),
             ),
-            Node::MemberExpression {
-                instance,
-                member,
-            } => format!(
-                "{}❇️{}",
-                instance.string(),
-                member.string(),
-            ),
+            Node::MemberExpression { instance, member } => {
+                format!("{}❇️{}", instance.string(), member.string(),)
+            }
         }
     }
 }
