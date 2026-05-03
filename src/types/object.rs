@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     hash::Hash,
-    sync::Arc,
+    sync::{Arc, LazyLock},
 };
 
 use ordered_float::OrderedFloat;
@@ -174,12 +174,7 @@ impl Object {
     }
 
     pub fn new_boolean(value: bool) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: if value {TRUE_VALUE} else {FALSE_VALUE},
-                associated_env: Environment::new_builtins(&[]),
-            }
-        )
+        if value {TRUE.clone()} else {FALSE.clone()}
     }
 
     pub fn new_string(value: String) -> Object {
@@ -192,12 +187,7 @@ impl Object {
     }
 
     pub fn new_null() -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: NULL_VALUE,
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Len]),
-            }
-        )
+        NULL.clone()
     }
 
     pub fn new_list(value: Vec<Object>) -> Object {
@@ -271,10 +261,26 @@ pub enum ObjectValue {
     Continue,
 }
 
-// todo
-pub const TRUE_VALUE: ObjectValue = ObjectValue::Boolean(true);
-pub const FALSE_VALUE: ObjectValue = ObjectValue::Boolean(false);
-pub const NULL_VALUE: ObjectValue = ObjectValue::Null;
+pub static TRUE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
+    Object {
+        value: ObjectValue::Boolean(true),
+        associated_env: Environment::new_builtins(&[]),
+    }
+));
+
+pub static FALSE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
+    Object {
+        value: ObjectValue::Boolean(false),
+        associated_env: Environment::new_builtins(&[]),
+    }
+));
+
+pub static NULL: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
+    Object {
+        value: ObjectValue::Null,
+        associated_env: Environment::new_builtins(&[]),
+    }
+));
 
 
 #[derive(PartialEq, Debug, Clone)]
