@@ -100,10 +100,10 @@ fn eval_assign_expression(
             Ok(value_object)
         }
         Node::IndexExpression {
-            collection: left,
+            collection,
             index,
         } => {
-            let mut collection_object = eval(*left.clone(), env)?;
+            let mut collection_object = eval(*collection.clone(), env)?; //eval_identifier return cloned object
             let index_object = eval(*index, env)?;
             match collection_object.value_mut() {
                 ObjectValue::List(elements) => {
@@ -112,7 +112,7 @@ fn eval_assign_expression(
                     {
                         if let Some(element) = elements.get_mut(*index as usize) {
                             *element = value_object.clone();
-                            if let Node::Identifier { value } = *left {
+                            if let Node::Identifier { value } = *collection {
                                 env.set(value, Object::new_list(elements.to_owned()));
                             }
                             Ok(value_object)
@@ -128,7 +128,7 @@ fn eval_assign_expression(
                 ObjectValue::Map(entries) => {
                     if let Some(element) = entries.get_mut(&index_object) {
                         *element = value_object.clone();
-                        if let Node::Identifier { value } = *left {
+                        if let Node::Identifier { value } = *collection {
                             env.set(value, Object::new_map(entries.to_owned()));
                         }
                         Ok(value_object)
@@ -144,7 +144,6 @@ fn eval_assign_expression(
             if let Node::Identifier { value } = *member {
                 let env = instance_object.associated_env_mut();
                 env.set(value, value_object.clone());
-                // instance_object.set_associated_env(env);
             }
             if let Node::Identifier { value } = *instance {
                 env.set(value, instance_object);
