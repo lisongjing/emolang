@@ -1,5 +1,5 @@
 use std::{
-    cell::{LazyCell, RefCell}, collections::HashMap, hash::Hash, rc::Rc, sync::{Arc, LazyLock, Mutex}
+    collections::HashMap, hash::Hash, sync::{Arc, LazyLock, Mutex}
 };
 
 use ordered_float::OrderedFloat;
@@ -70,7 +70,7 @@ impl Hash for Object {
             }
             ObjectValue::Reference(value) => {
                 9u32.hash(state);
-                value.borrow().hash(state);
+                (*value.lock().unwrap()).hash(state);
             }
             ObjectValue::ReturnValue(value) => {
                 10u32.hash(state);
@@ -130,7 +130,7 @@ impl Object {
                 "{}(args...){{ //builtin implementation }}",
                 val.name()
             ),
-            ObjectValue::Reference(val) => val.borrow().inspect(),
+            ObjectValue::Reference(val) => (*val.lock().unwrap()).inspect(),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -244,7 +244,7 @@ impl Object {
 }
 
 
-#[derive(PartialEq, Debug, Clone)]
+#[derive(Debug, Clone)]
 pub enum ObjectValue {
     Integer(i64),
     Float(f64),
@@ -259,12 +259,32 @@ pub enum ObjectValue {
         env: Box<Environment>,
     },
     BuiltinFunction(BuiltinFunction),
-    Reference(Rc<RefCell<Object>>),
+    Reference(Arc<Mutex<Object>>),
     ReturnValue(Box<Object>),
     Break(Option<Box<Object>>),
     Continue,
 }
 
+impl PartialEq for ObjectValue {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ObjectValue::Integer(a), ObjectValue::Integer(b)) => a == b,
+            (ObjectValue::Float(a), ObjectValue::Float(b)) => a == b,
+            (ObjectValue::Boolean(a), ObjectValue::Boolean(b)) => a == b,
+            (ObjectValue::String(a), ObjectValue::String(b)) => a == b,
+            (ObjectValue::Null, ObjectValue::Null) => true,
+            (ObjectValue::List(a), ObjectValue::List(b)) => a == b,
+            (ObjectValue::Map(a), ObjectValue::Map(b)) => a == b,
+            (ObjectValue::Function { parameters: ap, body: ab, env: _ }, ObjectValue::Function { parameters: bp, body: bb, env: _ }) => ap == bp && ab == bb,
+            (ObjectValue::BuiltinFunction(a), ObjectValue::BuiltinFunction(b)) => a == b,
+            (ObjectValue::Reference(a), ObjectValue::Reference(b)) => *a.lock().unwrap() == *b.lock().unwrap(),
+            (ObjectValue::ReturnValue(a), ObjectValue::ReturnValue(b)) => a == b,
+            (ObjectValue::Break(a), ObjectValue::Break(b)) => a == b,
+            (ObjectValue::Continue, ObjectValue::Continue) => true,
+            _ => false,
+        }
+    }
+}
 
 
 pub static TRUE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
