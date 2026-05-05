@@ -1,7 +1,5 @@
 use std::{
-    collections::HashMap,
-    hash::Hash,
-    sync::{Arc, LazyLock},
+    cell::{LazyCell, RefCell}, collections::HashMap, hash::Hash, rc::Rc, sync::{Arc, LazyLock, Mutex}
 };
 
 use ordered_float::OrderedFloat;
@@ -70,18 +68,22 @@ impl Hash for Object {
                 8u32.hash(state);
                 value.name().hash(state);
             }
-            ObjectValue::ReturnValue(value) => {
+            ObjectValue::Reference(value) => {
                 9u32.hash(state);
+                value.borrow().hash(state);
+            }
+            ObjectValue::ReturnValue(value) => {
+                10u32.hash(state);
                 value.hash(state);
             }
             ObjectValue::Break(value) => {
-                10u32.hash(state);
+                11u32.hash(state);
                 if let Some(val) = value {
                     val.hash(state);
                 }
             }
             ObjectValue::Continue => {
-                11u32.hash(state);
+                12u32.hash(state);
             }
         }
     }
@@ -128,6 +130,7 @@ impl Object {
                 "{}(args...){{ //builtin implementation }}",
                 val.name()
             ),
+            ObjectValue::Reference(val) => val.borrow().inspect(),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -256,10 +259,13 @@ pub enum ObjectValue {
         env: Box<Environment>,
     },
     BuiltinFunction(BuiltinFunction),
+    Reference(Rc<RefCell<Object>>),
     ReturnValue(Box<Object>),
     Break(Option<Box<Object>>),
     Continue,
 }
+
+
 
 pub static TRUE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
     Object {
@@ -281,6 +287,7 @@ pub static NULL: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_e
         associated_env: Environment::new_builtins(&[]),
     }
 ));
+
 
 
 #[derive(PartialEq, Debug, Clone)]
@@ -323,6 +330,16 @@ impl Environment {
             && let Some(outer) = &self.outer
         {
             obj = outer.get(identifier);
+        }
+        obj
+    }
+
+    pub fn get_mut(&mut self, identifier: &String) -> Option<&mut Object> {
+        let mut obj = self.map.get_mut(identifier);
+        if obj.is_none()
+            && let Some(outer) = &mut self.outer
+        {
+            obj = outer.get_mut(identifier);
         }
         obj
     }
