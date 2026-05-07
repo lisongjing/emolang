@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, hash::Hash, sync::{Arc, LazyLock, Mutex}
+    cell::RefCell, collections::HashMap, hash::Hash, rc::Rc
 };
 
 use ordered_float::OrderedFloat;
@@ -70,7 +70,7 @@ impl Hash for Object {
             }
             ObjectValue::Reference(value) => {
                 9u32.hash(state);
-                (*value.lock().unwrap()).hash(state);
+                value.borrow().hash(state);
             }
             ObjectValue::ReturnValue(value) => {
                 10u32.hash(state);
@@ -130,7 +130,7 @@ impl Object {
                 "{}(args...){{ //builtin implementation }}",
                 val.name()
             ),
-            ObjectValue::Reference(val) => (*val.lock().unwrap()).inspect(),
+            ObjectValue::Reference(val) => val.borrow().inspect(),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -177,7 +177,12 @@ impl Object {
     }
 
     pub fn new_boolean(value: bool) -> Object {
-        if value {TRUE.clone()} else {FALSE.clone()}
+        Self::set_self_in_assoc_env(
+            Object {
+                value: ObjectValue::Boolean(value),
+                associated_env: Environment::new_builtins(&[]),
+            }
+        )
     }
 
     pub fn new_string(value: String) -> Object {
@@ -190,7 +195,12 @@ impl Object {
     }
 
     pub fn new_null() -> Object {
-        NULL.clone()
+        Self::set_self_in_assoc_env(
+            Object {
+                value: ObjectValue::Null,
+                associated_env: Environment::new_builtins(&[]),
+            }
+        )
     }
 
     pub fn new_list(value: Vec<Object>) -> Object {
@@ -233,6 +243,15 @@ impl Object {
         )
     }
 
+    pub fn new_reference(value: Rc<RefCell<Object>>) -> Object {
+        Self::set_self_in_assoc_env(
+            Object {
+                value: ObjectValue::Reference(value),
+                associated_env: Environment::new_builtins(&[]),
+            }
+        )
+    }
+
     pub fn new_return_value(value: Object) -> Object {
         Self::set_self_in_assoc_env(
             Object {
@@ -244,7 +263,7 @@ impl Object {
 }
 
 
-#[derive(Debug, Clone)]
+#[derive(PartialEq, Debug, Clone)]
 pub enum ObjectValue {
     Integer(i64),
     Float(f64),
@@ -259,60 +278,16 @@ pub enum ObjectValue {
         env: Box<Environment>,
     },
     BuiltinFunction(BuiltinFunction),
-    Reference(Arc<Mutex<Object>>),
+    Reference(Rc<RefCell<Object>>),
     ReturnValue(Box<Object>),
     Break(Option<Box<Object>>),
     Continue,
 }
 
-impl PartialEq for ObjectValue {
-    fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (ObjectValue::Integer(a), ObjectValue::Integer(b)) => a == b,
-            (ObjectValue::Float(a), ObjectValue::Float(b)) => a == b,
-            (ObjectValue::Boolean(a), ObjectValue::Boolean(b)) => a == b,
-            (ObjectValue::String(a), ObjectValue::String(b)) => a == b,
-            (ObjectValue::Null, ObjectValue::Null) => true,
-            (ObjectValue::List(a), ObjectValue::List(b)) => a == b,
-            (ObjectValue::Map(a), ObjectValue::Map(b)) => a == b,
-            (ObjectValue::Function { parameters: ap, body: ab, env: _ }, ObjectValue::Function { parameters: bp, body: bb, env: _ }) => ap == bp && ab == bb,
-            (ObjectValue::BuiltinFunction(a), ObjectValue::BuiltinFunction(b)) => a == b,
-            (ObjectValue::Reference(a), ObjectValue::Reference(b)) => *a.lock().unwrap() == *b.lock().unwrap(),
-            (ObjectValue::ReturnValue(a), ObjectValue::ReturnValue(b)) => a == b,
-            (ObjectValue::Break(a), ObjectValue::Break(b)) => a == b,
-            (ObjectValue::Continue, ObjectValue::Continue) => true,
-            _ => false,
-        }
-    }
-}
-
-
-pub static TRUE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
-    Object {
-        value: ObjectValue::Boolean(true),
-        associated_env: Environment::new_builtins(&[]),
-    }
-));
-
-pub static FALSE: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
-    Object {
-        value: ObjectValue::Boolean(false),
-        associated_env: Environment::new_builtins(&[]),
-    }
-));
-
-pub static NULL: LazyLock<Object> = LazyLock::new(|| Object::set_self_in_assoc_env(
-    Object {
-        value: ObjectValue::Null,
-        associated_env: Environment::new_builtins(&[]),
-    }
-));
-
-
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Environment {
-    map: HashMap<String, Object>,
+    map: HashMap<String, Rc<RefCell<Object>>>,
     outer: Option<Box<Environment>>,
 }
 
@@ -341,10 +316,10 @@ impl Environment {
     }
 
     pub fn set(&mut self, identifier: String, value: Object) {
-        self.map.insert(identifier, value);
+        self.map.insert(identifier, Rc::new(RefCell::new(value)));
     }
 
-    pub fn get(&self, identifier: &String) -> Option<&Object> {
+    pub fn get(&self, identifier: &String) -> Option<&Rc<RefCell<Object>>> {
         let mut obj = self.map.get(identifier);
         if obj.is_none()
             && let Some(outer) = &self.outer
@@ -353,19 +328,9 @@ impl Environment {
         }
         obj
     }
-
-    pub fn get_mut(&mut self, identifier: &String) -> Option<&mut Object> {
-        let mut obj = self.map.get_mut(identifier);
-        if obj.is_none()
-            && let Some(outer) = &mut self.outer
-        {
-            obj = outer.get_mut(identifier);
-        }
-        obj
-    }
 }
 
-type FunctionWrapper = Arc<dyn Fn(&[Object]) -> Result<Object, String> + Send + Sync>;
+type FunctionWrapper = Rc<dyn Fn(&[Object]) -> Result<Object, String> + Send + Sync>;
 
 #[derive(PartialEq, Debug, Clone)]
 pub enum BuiltinFunction {
@@ -397,24 +362,24 @@ impl BuiltinFunction {
 
     pub fn function(&self) -> FunctionWrapper {
         match self {
-            BuiltinFunction::ToString => Arc::new(BuiltinFunction::to_string) as FunctionWrapper,
-            BuiltinFunction::Print => Arc::new(BuiltinFunction::print) as FunctionWrapper,
-            BuiltinFunction::Println => Arc::new(BuiltinFunction::println) as FunctionWrapper,
+            BuiltinFunction::ToString => Rc::new(BuiltinFunction::to_string) as FunctionWrapper,
+            BuiltinFunction::Print => Rc::new(BuiltinFunction::print) as FunctionWrapper,
+            BuiltinFunction::Println => Rc::new(BuiltinFunction::println) as FunctionWrapper,
 
-            BuiltinFunction::Pow => Arc::new(BuiltinFunction::pow) as FunctionWrapper,
-            BuiltinFunction::Len => Arc::new(BuiltinFunction::len) as FunctionWrapper,
+            BuiltinFunction::Pow => Rc::new(BuiltinFunction::pow) as FunctionWrapper,
+            BuiltinFunction::Len => Rc::new(BuiltinFunction::len) as FunctionWrapper,
         }
     }
 
     // api
 
-    pub fn register_exports(map: &mut HashMap<String, Object>) {
+    pub fn register_exports(map: &mut HashMap<String, Rc<RefCell<Object>>>) {
         BuiltinFunction::register(&BuiltinFunction::EXPORTS, map);
     }
 
-    pub fn register(functions: &[BuiltinFunction], map: &mut HashMap<String, Object>) {
+    pub fn register(functions: &[BuiltinFunction], map: &mut HashMap<String, Rc<RefCell<Object>>>) {
         for function in functions {
-            map.insert(function.name(), Object::new_butlin_function(function.clone()));
+            map.insert(function.name(), Rc::new(RefCell::new(Object::new_butlin_function(function.clone()))));
         }
     }
 
