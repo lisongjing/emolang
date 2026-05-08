@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell, collections::HashMap, hash::Hash, rc::Rc
+    collections::HashMap, hash::Hash, rc::Rc
 };
 
 use ordered_float::OrderedFloat;
@@ -68,10 +68,10 @@ impl Hash for Object {
                 8u32.hash(state);
                 value.name().hash(state);
             }
-            ObjectValue::Reference(value) => {
-                9u32.hash(state);
-                value.borrow().hash(state);
-            }
+            // ObjectValue::Reference(value) => {
+            //     9u32.hash(state);
+            //     value.borrow().hash(state);
+            // }
             ObjectValue::ReturnValue(value) => {
                 10u32.hash(state);
                 value.hash(state);
@@ -130,7 +130,7 @@ impl Object {
                 "{}(args...){{ //builtin implementation }}",
                 val.name()
             ),
-            ObjectValue::Reference(val) => val.borrow().inspect(),
+            // ObjectValue::Reference(val) => val.borrow().inspect(),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -243,14 +243,14 @@ impl Object {
         )
     }
 
-    pub fn new_reference(value: Rc<RefCell<Object>>) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Reference(value),
-                associated_env: Environment::new_builtins(&[]),
-            }
-        )
-    }
+    // pub fn new_reference(value: Rc<RefCell<Object>>) -> Object {
+    //     Self::set_self_in_assoc_env(
+    //         Object {
+    //             value: ObjectValue::Reference(value),
+    //             associated_env: Environment::new_builtins(&[]),
+    //         }
+    //     )
+    // }
 
     pub fn new_return_value(value: Object) -> Object {
         Self::set_self_in_assoc_env(
@@ -278,7 +278,7 @@ pub enum ObjectValue {
         env: Box<Environment>,
     },
     BuiltinFunction(BuiltinFunction),
-    Reference(Rc<RefCell<Object>>),
+    // Reference(Rc<RefCell<Object>>),
     ReturnValue(Box<Object>),
     Break(Option<Box<Object>>),
     Continue,
@@ -287,7 +287,7 @@ pub enum ObjectValue {
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Environment {
-    map: HashMap<String, Rc<RefCell<Object>>>,
+    map: HashMap<String, Object>,
     outer: Option<Box<Environment>>,
 }
 
@@ -316,15 +316,25 @@ impl Environment {
     }
 
     pub fn set(&mut self, identifier: String, value: Object) {
-        self.map.insert(identifier, Rc::new(RefCell::new(value)));
+        self.map.insert(identifier, value);
     }
 
-    pub fn get(&self, identifier: &String) -> Option<&Rc<RefCell<Object>>> {
+    pub fn get(&self, identifier: &String) -> Option<&Object> {
         let mut obj = self.map.get(identifier);
         if obj.is_none()
             && let Some(outer) = &self.outer
         {
             obj = outer.get(identifier);
+        }
+        obj
+    }
+
+    pub fn get_mut(&mut self, identifier: &String) -> Option<&mut Object> {
+        let mut obj = self.map.get_mut(identifier);
+        if obj.is_none()
+            && let Some(outer) = &mut self.outer
+        {
+            obj = outer.get_mut(identifier);
         }
         obj
     }
@@ -373,13 +383,13 @@ impl BuiltinFunction {
 
     // api
 
-    pub fn register_exports(map: &mut HashMap<String, Rc<RefCell<Object>>>) {
+    pub fn register_exports(map: &mut HashMap<String, Object>) {
         BuiltinFunction::register(&BuiltinFunction::EXPORTS, map);
     }
 
-    pub fn register(functions: &[BuiltinFunction], map: &mut HashMap<String, Rc<RefCell<Object>>>) {
+    pub fn register(functions: &[BuiltinFunction], map: &mut HashMap<String, Object>) {
         for function in functions {
-            map.insert(function.name(), Rc::new(RefCell::new(Object::new_butlin_function(function.clone()))));
+            map.insert(function.name(), Object::new_butlin_function(function.clone()));
         }
     }
 
