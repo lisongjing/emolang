@@ -13,17 +13,17 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         Node::ListLiteral { elements } => eval_list_literal(elements, env),
         Node::MapLiteral { entries } => eval_map_literal(entries, env),
         Node::PrefixExpression { operator, right } => {
-            eval_prefix_expression(operator, eval(*right, env)?)
+            eval_prefix_expression(operator, &eval(*right, env)?)
         }
         Node::InfixExpression {
             left,
             operator,
             right,
-        } => eval_infix_expression(operator, eval(*left, env)?, eval(*right, env)?),
+        } => eval_infix_expression(operator, &eval(*left, env)?, &eval(*right, env)?),
         Node::IndexExpression {
-            collection: left,
+            collection,
             index,
-        } => eval_index_expression(eval(*left, env)?, eval(*index, env)?),
+        } => eval_index_expression(&eval(*collection, env)?, &eval(*index, env)?),
         Node::BlockStatement { statements } => eval_block_statements(statements, env),
         Node::IfExpression {
             condition,
@@ -54,10 +54,10 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         } => {
             let function = eval(*function, env)?;
             let args = eval_expressions(arguments, env)?;
-            apply_function(function, args)
+            apply_function(&function, &args)
         }
         Node::MemberExpression { instance, member } => {
-            eval_member_expression(eval(*instance, env)?, *member)
+            eval_member_expression(&mut eval(*instance, env)?, *member)
         }
     }
 }
@@ -173,10 +173,10 @@ fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result
     Ok(Object::new_map(value))
 }
 
-fn eval_prefix_expression(operator: String, right: Object) -> Result<Object, String> {
+fn eval_prefix_expression(operator: String, right: &Object) -> Result<Object, String> {
     match operator.as_str() {
-        "⏸️" => eval_prefix_not_expression(&right),
-        "➖" => eval_prefix_minus_expression(&right),
+        "⏸️" => eval_prefix_not_expression(right),
+        "➖" => eval_prefix_minus_expression(right),
         _ => Err(String::from(
             "Invalid prefix expressions to evaluate values",
         )),
@@ -212,7 +212,7 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
     }
 }
 
-fn eval_infix_expression(operator: String, left: Object, right: Object) -> Result<Object, String> {
+fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Result<Object, String> {
     if let ObjectValue::Integer(left) = left.value()
         && let ObjectValue::Integer(right) = right.value()
     {
@@ -347,8 +347,8 @@ fn eval_list_infix_expression(
     }
 }
 
-fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> {
-    match left.value() {
+fn eval_index_expression(collection: &Object, index: &Object) -> Result<Object, String> {
+    match collection.value() {
         ObjectValue::List(elements) => {
             if let ObjectValue::Integer(index) = index.value()
                 && *index >= 0
@@ -364,7 +364,7 @@ fn eval_index_expression(left: Object, index: Object) -> Result<Object, String> 
             }
         }
         ObjectValue::Map(entries) => entries
-            .get(&index)
+            .get(index)
             .cloned()
             .ok_or_else(|| format!("Invalid index: {index:?}")),
         _ => Err(String::from("Invalid collection type to index")),
@@ -432,7 +432,7 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
     Ok(args)
 }
 
-fn eval_member_expression(mut instance: Object, right: Node) -> Result<Object, String> {
+fn eval_member_expression(instance: &mut Object, right: Node) -> Result<Object, String> {
     let env = instance.associated_env_mut();
     let right = if let Node::CallExpression {
         function,
@@ -457,7 +457,7 @@ fn eval_member_expression(mut instance: Object, right: Node) -> Result<Object, S
     eval(right, env)
 }
 
-fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
+fn apply_function(function: &Object, args: &[Object]) -> Result<Object, String> {
     match function.value() {
         ObjectValue::Function {
             parameters,
@@ -486,7 +486,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
                 Ok(return_val)
             }
         }
-        ObjectValue::BuiltinFunction(function) => function.call(&args),
+        ObjectValue::BuiltinFunction(function) => function.call(args),
         _ => Err(format!("Not a function: {}", function.inspect())),
     }
 }
