@@ -20,10 +20,9 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             operator,
             right,
         } => eval_infix_expression(operator, &eval(*left, env)?, &eval(*right, env)?),
-        Node::IndexExpression {
-            collection,
-            index,
-        } => eval_index_expression(&eval(*collection, env)?, &eval(*index, env)?),
+        Node::IndexExpression { collection, index } => {
+            eval_index_expression(&eval(*collection, env)?, &eval(*index, env)?)
+        }
         Node::BlockStatement { statements } => eval_block_statements(statements, env),
         Node::IfExpression {
             condition,
@@ -99,12 +98,16 @@ fn eval_assign_expression(
             env.set(value, value_object.clone());
             Ok(value_object)
         }
-        Node::IndexExpression {
-            collection,
-            index,
-        } => {
-            let mut collection_object = eval(*collection.clone(), env)?; //eval_identifier return cloned object
+        Node::IndexExpression { collection, index } => {
             let index_object = eval(*index, env)?;
+
+            let collection_object = if let Node::Identifier { value } = *collection {
+                env.get_mut(&value)
+                    .ok_or_else(|| format!("identifier not found: {value}"))?
+            } else {
+                &mut eval(*collection.clone(), env)?
+            };
+
             match collection_object.value_mut() {
                 ObjectValue::List(elements) => {
                     if let ObjectValue::Integer(index) = index_object.value()
@@ -112,9 +115,6 @@ fn eval_assign_expression(
                     {
                         if let Some(element) = elements.get_mut(*index as usize) {
                             *element = value_object.clone();
-                            if let Node::Identifier { value } = *collection {
-                                env.set(value, Object::new_list(elements.to_owned()));
-                            }
                             Ok(value_object)
                         } else {
                             Err(format!("Invalid index: {index}"))
@@ -128,9 +128,6 @@ fn eval_assign_expression(
                 ObjectValue::Map(entries) => {
                     if let Some(element) = entries.get_mut(&index_object) {
                         *element = value_object.clone();
-                        if let Node::Identifier { value } = *collection {
-                            env.set(value, Object::new_map(entries.to_owned()));
-                        }
                         Ok(value_object)
                     } else {
                         Err(format!("Invalid index: {index_object:?}"))
@@ -140,13 +137,17 @@ fn eval_assign_expression(
             }
         }
         Node::MemberExpression { instance, member } => {
-            let mut instance_object = eval(*instance.clone(), env)?;
+            let instance_object = if let Node::Identifier { value } = *instance {
+                env.get_mut(&value)
+                    .ok_or_else(|| format!("identifier not found: {value}"))?
+            } else {
+                &mut eval(*instance.clone(), env)?
+            };
+
             if let Node::Identifier { value } = *member {
-                let env = instance_object.associated_env_mut();
-                env.set(value, value_object.clone());
-            }
-            if let Node::Identifier { value } = *instance {
-                env.set(value, instance_object);
+                instance_object
+                    .associated_env_mut()
+                    .set(value, value_object.clone());
             }
             Ok(value_object)
         }
@@ -212,7 +213,11 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
     }
 }
 
-fn eval_infix_expression(operator: String, left: &Object, right: &Object) -> Result<Object, String> {
+fn eval_infix_expression(
+    operator: String,
+    left: &Object,
+    right: &Object,
+) -> Result<Object, String> {
     if let ObjectValue::Integer(left) = left.value()
         && let ObjectValue::Integer(right) = right.value()
     {
