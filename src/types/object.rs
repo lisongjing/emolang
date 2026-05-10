@@ -145,6 +145,10 @@ impl Object {
         &mut self.value
     }
 
+    pub fn value_owned(self) -> ObjectValue {
+        self.value
+    }
+
     pub fn associated_env(&self) -> &Environment {
         &self.associated_env
     }

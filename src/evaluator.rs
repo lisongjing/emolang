@@ -53,7 +53,7 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
         } => {
             let function = eval(*function, env)?;
             let args = eval_expressions(arguments, env)?;
-            apply_function(&function, &args)
+            apply_function(function, args)
         }
         Node::MemberExpression { instance, member } => {
             eval_member_expression(&mut eval(*instance, env)?, *member)
@@ -462,8 +462,8 @@ fn eval_member_expression(instance: &mut Object, right: Node) -> Result<Object, 
     eval(right, env)
 }
 
-fn apply_function(function: &Object, args: &[Object]) -> Result<Object, String> {
-    match function.value() {
+fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
+    match function.value_owned() {
         ObjectValue::Function {
             parameters,
             body,
@@ -477,22 +477,23 @@ fn apply_function(function: &Object, args: &[Object]) -> Result<Object, String> 
                 ));
             }
             let mut env = Environment::new_enclosed(env.clone());
-            for (index, param) in parameters.iter().enumerate() {
+            let mut arg_iter = args.into_iter();
+            for param in parameters.into_iter() {
                 if let Node::Identifier { value } = param {
-                    env.set(value.clone(), args.get(index).unwrap().clone());
+                    env.set(value, arg_iter.next().ok_or(String::from("miss parameter"))?);
                 } else {
                     return Err(format!("Not a identifier: {}", param.string()));
                 }
             }
-            let return_val = eval(*body.clone(), &mut env)?;
+            let return_val = eval(*body, &mut env)?;
             if let ObjectValue::ReturnValue(value) = return_val.value() {
                 Ok(*value.clone())
             } else {
                 Ok(return_val)
             }
         }
-        ObjectValue::BuiltinFunction(function) => function.call(args),
-        _ => Err(format!("Not a function: {}", function.inspect())),
+        ObjectValue::BuiltinFunction(function) => function.call(&args),
+        _ => Err(String::from("Not a function")),
     }
 }
 
