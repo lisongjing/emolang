@@ -2,46 +2,46 @@ use std::collections::HashMap;
 
 use crate::types::{Node, Token, object::*};
 
-pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
+pub fn eval(node: &Node, env: &mut Environment) -> Result<Object, String> {
     match node {
         Node::Program { statements } => eval_program(statements, env),
-        Node::ExpressionStatement { expression } => eval(*expression, env),
-        Node::IntegerLiteral { value } => Ok(Object::new_integer(value)),
-        Node::FloatLiteral { value } => Ok(Object::new_float(value)),
-        Node::BooleanLiteral { value } => Ok(Object::new_boolean(value)),
-        Node::StringLiteral { value } => Ok(Object::new_string(value)),
+        Node::ExpressionStatement { expression } => eval(expression, env),
+        Node::IntegerLiteral { value } => Ok(Object::new_integer(*value)),
+        Node::FloatLiteral { value } => Ok(Object::new_float(*value)),
+        Node::BooleanLiteral { value } => Ok(Object::new_boolean(*value)),
+        Node::StringLiteral { value } => Ok(Object::new_string(value.clone())),
         Node::ListLiteral { elements } => eval_list_literal(elements, env),
         Node::MapLiteral { entries } => eval_map_literal(entries, env),
         Node::PrefixExpression { operator, right } => {
-            eval_prefix_expression(operator, &eval(*right, env)?)
+            eval_prefix_expression(operator, &eval(right, env)?)
         }
         Node::InfixExpression {
             left,
             operator,
             right,
-        } => eval_infix_expression(operator, &eval(*left, env)?, &eval(*right, env)?),
+        } => eval_infix_expression(operator, &eval(left, env)?, &eval(right, env)?),
         Node::IndexExpression { collection, index } => {
-            eval_index_expression(&eval(*collection, env)?, &eval(*index, env)?)
+            eval_index_expression(&eval(collection, env)?, &eval(index, env)?)
         }
         Node::BlockStatement { statements } => eval_block_statements(statements, env),
         Node::IfExpression {
             condition,
             consequence,
             alternative,
-        } => eval_if_expression(*condition, *consequence, alternative, env),
-        Node::WhileExpression { condition, body } => eval_while_expression(*condition, *body, env),
+        } => eval_if_expression(condition, consequence, alternative, env),
+        Node::WhileExpression { condition, body } => eval_while_expression(condition, body, env),
         Node::BreakExpression { value } => eval_break_expression(value, env),
-        Node::ReturnStatement { value } => Ok(Object::new_return_value(eval(*value, env)?)),
+        Node::ReturnStatement { value } => Ok(Object::new_return_value(eval(value, env)?)),
         Node::AssignExpression { identifier, value } => {
-            eval_assign_expression(*identifier, *value, env)
+            eval_assign_expression(identifier, value, env)
         }
-        Node::Identifier { value } => eval_identifier(&value, env),
+        Node::Identifier { value } => eval_identifier(value, env),
         Node::FunctionLiteral {
             name,
             parameters,
             body,
         } => {
-            let function = Object::new_function(parameters, body, env.clone());
+            let function = Object::new_function(parameters.clone(), body.clone(), env.clone());
             if let Some(name) = name {
                 env.set(name.string(), function.clone());
             }
@@ -51,17 +51,17 @@ pub fn eval(node: Node, env: &mut Environment) -> Result<Object, String> {
             function,
             arguments,
         } => {
-            let function = eval(*function, env)?;
+            let function = eval(function, env)?;
             let args = eval_expressions(arguments, env)?;
             apply_function(function, args)
         }
         Node::MemberExpression { instance, member } => {
-            eval_member_expression(&mut eval(*instance, env)?, *member)
+            eval_member_expression(&mut eval(instance, env)?, member)
         }
     }
 }
 
-fn eval_program(statements: Vec<Node>, env: &mut Environment) -> Result<Object, String> {
+fn eval_program(statements: &Vec<Node>, env: &mut Environment) -> Result<Object, String> {
     let mut result = Err(String::from("Empty statements to evaluate values"));
     for statement in statements {
         result = eval(statement, env);
@@ -74,7 +74,7 @@ fn eval_program(statements: Vec<Node>, env: &mut Environment) -> Result<Object, 
     result
 }
 
-fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result<Object, String> {
+fn eval_block_statements(statements: &Vec<Node>, env: &mut Environment) -> Result<Object, String> {
     let mut result = Err(String::from("Empty statements to evaluate values"));
     for statement in statements {
         result = eval(statement, env);
@@ -88,24 +88,24 @@ fn eval_block_statements(statements: Vec<Node>, env: &mut Environment) -> Result
 }
 
 fn eval_assign_expression(
-    identifier: Node,
-    value: Node,
+    identifier: &Node,
+    value: &Node,
     env: &mut Environment,
 ) -> Result<Object, String> {
     let value_object = eval(value, env)?;
     match identifier {
         Node::Identifier { value } => {
-            env.set(value, value_object.clone());
+            env.set(value.clone(), value_object.clone());
             Ok(value_object)
         }
         Node::IndexExpression { collection, index } => {
-            let index_object = eval(*index, env)?;
+            let index_object = eval(index, env)?;
 
-            let collection_object = if let Node::Identifier { value } = *collection {
-                env.get_mut(&value)
+            let collection_object = if let Node::Identifier { value } = &**collection {
+                env.get_mut(value)
                     .ok_or_else(|| format!("identifier not found: {value}"))?
             } else {
-                &mut eval(*collection.clone(), env)?
+                &mut eval(collection, env)?
             };
 
             match collection_object.value_mut() {
@@ -137,17 +137,17 @@ fn eval_assign_expression(
             }
         }
         Node::MemberExpression { instance, member } => {
-            let instance_object = if let Node::Identifier { value } = *instance {
-                env.get_mut(&value)
+            let instance_object = if let Node::Identifier { value } = &**instance {
+                env.get_mut(value)
                     .ok_or_else(|| format!("identifier not found: {value}"))?
             } else {
-                &mut eval(*instance.clone(), env)?
+                &mut eval(instance, env)?
             };
 
-            if let Node::Identifier { value } = *member {
+            if let Node::Identifier { value } = &**member {
                 instance_object
                     .associated_env_mut()
-                    .set(value, value_object.clone());
+                    .set(value.clone(), value_object.clone());
             }
             Ok(value_object)
         }
@@ -158,7 +158,7 @@ fn eval_assign_expression(
     }
 }
 
-fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Object, String> {
+fn eval_list_literal(elements: &Vec<Node>, env: &mut Environment) -> Result<Object, String> {
     let mut value = vec![];
     for node in elements {
         value.push(eval(node, env)?);
@@ -166,7 +166,7 @@ fn eval_list_literal(elements: Vec<Node>, env: &mut Environment) -> Result<Objec
     Ok(Object::new_list(value))
 }
 
-fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result<Object, String> {
+fn eval_map_literal(entries: &Vec<(Node, Node)>, env: &mut Environment) -> Result<Object, String> {
     let mut value = HashMap::new();
     for (key, val) in entries {
         value.insert(eval(key, env)?, eval(val, env)?);
@@ -174,8 +174,8 @@ fn eval_map_literal(entries: Vec<(Node, Node)>, env: &mut Environment) -> Result
     Ok(Object::new_map(value))
 }
 
-fn eval_prefix_expression(operator: String, right: &Object) -> Result<Object, String> {
-    match operator.as_str() {
+fn eval_prefix_expression(operator: &str, right: &Object) -> Result<Object, String> {
+    match operator {
         "⏸️" => eval_prefix_not_expression(right),
         "➖" => eval_prefix_minus_expression(right),
         _ => Err(String::from(
@@ -214,7 +214,7 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
 }
 
 fn eval_infix_expression(
-    operator: String,
+    operator: &str,
     left: &Object,
     right: &Object,
 ) -> Result<Object, String> {
@@ -259,11 +259,11 @@ fn eval_infix_expression(
 }
 
 fn eval_integer_infix_expression(
-    operator: String,
+    operator: &str,
     left: i64,
     right: i64,
 ) -> Result<Object, String> {
-    match operator.as_str() {
+    match operator {
         "➕" => Ok(Object::new_integer(left + right)),
         "➖" => Ok(Object::new_integer(left - right)),
         "✖️" => Ok(Object::new_integer(left * right)),
@@ -279,8 +279,8 @@ fn eval_integer_infix_expression(
     }
 }
 
-fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Result<Object, String> {
-    match operator.as_str() {
+fn eval_float_infix_expression(operator: &str, left: f64, right: f64) -> Result<Object, String> {
+    match operator {
         "➕" => Ok(Object::new_float(left + right)),
         "➖" => Ok(Object::new_float(left - right)),
         "✖️" => Ok(Object::new_float(left * right)),
@@ -297,11 +297,11 @@ fn eval_float_infix_expression(operator: String, left: f64, right: f64) -> Resul
 }
 
 fn eval_boolean_infix_expression(
-    operator: String,
+    operator: &str,
     left: bool,
     right: bool,
 ) -> Result<Object, String> {
-    match operator.as_str() {
+    match operator {
         "🟰" => Ok(Object::new_boolean(left == right)),
         "❗🟰" => Ok(Object::new_boolean(left != right)),
         "🔁" => Ok(Object::new_boolean(left && right)),
@@ -311,11 +311,11 @@ fn eval_boolean_infix_expression(
 }
 
 fn eval_string_infix_expression(
-    operator: String,
+    operator: &str,
     left: &str,
     right: &str,
 ) -> Result<Object, String> {
-    match operator.as_str() {
+    match operator {
         "➕" => {
             let mut join = String::from(left);
             join.push_str(right);
@@ -328,11 +328,11 @@ fn eval_string_infix_expression(
 }
 
 fn eval_list_infix_expression(
-    operator: String,
+    operator: &str,
     left: &Vec<Object>,
     right: &Vec<Object>,
 ) -> Result<Object, String> {
-    match operator.as_str() {
+    match operator {
         "➕" => {
             let mut union = left.clone();
             union.extend_from_slice(right);
@@ -377,33 +377,33 @@ fn eval_index_expression(collection: &Object, index: &Object) -> Result<Object, 
 }
 
 fn eval_if_expression(
-    condition: Node,
-    consequence: Node,
-    alternative: Option<Box<Node>>,
+    condition: &Node,
+    consequence: &Node,
+    alternative: &Option<Box<Node>>,
     env: &mut Environment,
 ) -> Result<Object, String> {
     if eval_condition(condition, env)? {
         eval(consequence, env)
     } else if let Some(alternative) = alternative {
-        eval(*alternative, env)
+        eval(alternative, env)
     } else {
         Ok(Object::new_null())
     }
 }
 
 fn eval_while_expression(
-    condition: Node,
-    body: Node,
+    condition: &Node,
+    body: &Node,
     env: &mut Environment,
 ) -> Result<Object, String> {
-    while eval_condition(condition.clone(), env)? {
-        eval(body.clone(), env)?;
+    while eval_condition(condition, env)? {
+        eval(body, env)?;
     }
     Ok(Object::new_null())
 }
 
 fn eval_break_expression(
-    _break_value: Option<Box<Node>>,
+    _break_value: &Option<Box<Node>>,
     _env: &mut Environment,
 ) -> Result<Object, String> {
     // let value = if let Some(value) = break_value {
@@ -415,7 +415,7 @@ fn eval_break_expression(
     Ok(Object::new_null())
 }
 
-fn eval_condition(condition: Node, env: &mut Environment) -> Result<bool, String> {
+fn eval_condition(condition: &Node, env: &mut Environment) -> Result<bool, String> {
     Ok(match eval(condition, env)?.value() {
         ObjectValue::Null => false,
         ObjectValue::Boolean(boolean) => *boolean,
@@ -429,7 +429,7 @@ fn eval_identifier(value: &String, env: &Environment) -> Result<Object, String> 
         .ok_or_else(|| format!("identifier not found: {value}"))
 }
 
-fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<Object>, String> {
+fn eval_expressions(arguments: &Vec<Node>, env: &mut Environment) -> Result<Vec<Object>, String> {
     let mut args = vec![];
     for arg in arguments {
         args.push(eval(arg, env)?);
@@ -437,14 +437,15 @@ fn eval_expressions(arguments: Vec<Node>, env: &mut Environment) -> Result<Vec<O
     Ok(args)
 }
 
-fn eval_member_expression(instance: &mut Object, right: Node) -> Result<Object, String> {
+fn eval_member_expression(instance: &mut Object, member: &Node) -> Result<Object, String> {
     let env = instance.associated_env_mut();
-    let right = if let Node::CallExpression {
+    let member = if let Node::CallExpression {
         function,
-        mut arguments,
-    } = right
+        arguments,
+    } = member
     {
         let self_token = Token::this();
+        let mut arguments = arguments.clone();
         arguments.insert(
             0,
             Node::Identifier {
@@ -452,14 +453,14 @@ fn eval_member_expression(instance: &mut Object, right: Node) -> Result<Object, 
             },
         );
 
-        Node::CallExpression {
-            function,
+        &Node::CallExpression {
+            function: function.clone(),
             arguments,
         }
     } else {
-        right
+        member
     };
-    eval(right, env)
+    eval(member, env)
 }
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
@@ -485,7 +486,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
                     return Err(format!("Not a identifier: {}", param.string()));
                 }
             }
-            let return_val = eval(*body, &mut env)?;
+            let return_val = eval(&body, &mut env)?;
             if let ObjectValue::ReturnValue(value) = return_val.value() {
                 Ok(*value.clone())
             } else {
@@ -529,7 +530,7 @@ mod evaluator_test {
         let mut parser = Parser::new(&mut lexer);
         let program = parser.parse_program();
         let mut env = Environment::new_default();
-        let evaluated = eval(program, &mut env);
+        let evaluated = eval(&program, &mut env);
 
         assert!(evaluated.is_ok());
         assert_eq!(evaluated.unwrap(), Object::new_integer(121));

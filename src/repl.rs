@@ -22,7 +22,7 @@ pub fn start() {
             continue;
         }
 
-        match eval(program, &mut env) {
+        match eval(&program, &mut env) {
             Ok(evaluated) => println!("{}", evaluated.inspect()),
             Err(error) => println!("Evaluator error:\n\t{error}"),
         }
