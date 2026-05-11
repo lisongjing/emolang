@@ -62,29 +62,35 @@ pub fn eval(node: &Node, env: &mut Environment) -> Result<Object, String> {
 }
 
 fn eval_program(statements: &Vec<Node>, env: &mut Environment) -> Result<Object, String> {
-    let mut result = Err(String::from("Empty statements to evaluate values"));
+    if statements.is_empty() {
+        return Err(String::from("Empty statements to evaluate values"));
+    }
+
+    let mut obj = Object::new_null();
     for statement in statements {
-        result = eval(statement, env);
-        if let Ok(ref obj) = result
-            && let ObjectValue::ReturnValue(value) = obj.value()
+        obj = eval(statement, env)?;
+        if let ObjectValue::ReturnValue(value) = obj.value()
         {
             return Ok(*value.clone());
         }
     }
-    result
+    Ok(obj)
 }
 
 fn eval_block_statements(statements: &Vec<Node>, env: &mut Environment) -> Result<Object, String> {
-    let mut result = Err(String::from("Empty statements to evaluate values"));
+    if statements.is_empty() {
+        return Err(String::from("Empty statements to evaluate values"));
+    }
+
+    let mut obj = Object::new_null();
     for statement in statements {
-        result = eval(statement, env);
-        if let Ok(ref obj) = result
-            && let ObjectValue::ReturnValue(_) = obj.value()
+        obj = eval(statement, env)?;
+        if let ObjectValue::ReturnValue(_) = obj.value()
         {
-            return result;
+            return Ok(obj);
         }
     }
-    result
+    Ok(obj)
 }
 
 fn eval_assign_expression(
