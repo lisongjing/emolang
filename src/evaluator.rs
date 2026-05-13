@@ -450,12 +450,12 @@ fn eval_member_expression(instance: &mut Object, member: &Node) -> Result<Object
         arguments,
     } = member
     {
-        let self_token = Token::this();
+        let this_token = Token::this();
         let mut arguments = arguments.clone();
         arguments.insert(
             0,
             Node::Identifier {
-                value: self_token.literal,
+                value: this_token.literal,
             },
         );
 
@@ -483,7 +483,7 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
                     args.len()
                 ));
             }
-            let mut env = Environment::new_enclosed(env.clone());
+            let mut env = Environment::new_enclosed(env);
             let mut arg_iter = args.into_iter();
             for param in parameters.into_iter() {
                 if let Node::Identifier { value } = param {
