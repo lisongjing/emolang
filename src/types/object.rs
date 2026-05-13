@@ -297,11 +297,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new_default() -> Self {
-        let mut map = HashMap::new();
-
-        BuiltinFunction::register_exports(&mut map);
-
-        Environment { map, outer: None }
+        Environment::new_builtins(&BuiltinFunction::EXPORTS)
     }
 
     pub fn new_enclosed(outer: Box<Environment>) -> Self {
@@ -314,7 +310,9 @@ impl Environment {
     pub fn new_builtins(builtin_functions: &[BuiltinFunction]) -> Self {
         let mut map = HashMap::new();
 
-        BuiltinFunction::register(builtin_functions, &mut map);
+        for function in builtin_functions {
+            map.insert(function.name(), Object::new_butlin_function(function.clone()));
+        }
 
         Environment { map, outer: None }
     }
@@ -386,16 +384,6 @@ impl BuiltinFunction {
     }
 
     // api
-
-    pub fn register_exports(map: &mut HashMap<String, Object>) {
-        BuiltinFunction::register(&BuiltinFunction::EXPORTS, map);
-    }
-
-    pub fn register(functions: &[BuiltinFunction], map: &mut HashMap<String, Object>) {
-        for function in functions {
-            map.insert(function.name(), Object::new_butlin_function(function.clone()));
-        }
-    }
 
     pub fn call(&self, args: &[Object]) -> Result<Object, String> {
         self.function()(args)
