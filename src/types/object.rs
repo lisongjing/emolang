@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, hash::Hash, rc::Rc
+    cell::RefCell, collections::HashMap, hash::Hash, rc::Rc
 };
 
 use ordered_float::OrderedFloat;
@@ -10,7 +10,7 @@ use crate::{types::Node, util::emoji_convert::object_to_emoji};
 #[derive(Debug, Clone)]
 pub struct Object {
     value: ObjectValue,
-    associated_env: Environment,
+    associated_env: Rc<RefCell<Environment>>,
 }
 
 impl PartialEq for Object {
@@ -149,119 +149,93 @@ impl Object {
         self.value
     }
 
-    pub fn associated_env(&self) -> &Environment {
-        &self.associated_env
+    pub fn associated_env(&self) -> Rc<RefCell<Environment>> {
+        &self.associated_env.borrow_mut().set("🈯".to_string(), self.clone());
+        Rc::clone(&self.associated_env)
     }
 
-    pub fn associated_env_mut(&mut self) -> &mut Environment {
-        &mut self.associated_env
-    }
-
-    fn set_self_in_assoc_env(mut obj: Object) -> Object {
-        obj.associated_env.set("🈯".to_string(), obj.clone());
-        obj
+    pub fn new(value: ObjectValue, env: Environment) -> Object {
+        Object { value, associated_env: Rc::new(RefCell::new(env)) }
     }
 
     pub fn new_integer(value: i64) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Integer(value),
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Pow]),
-            }
+        Self::new(
+            ObjectValue::Integer(value),
+            Environment::new_builtins(&[BuiltinFunction::Pow]),
         )
     }
 
     pub fn new_float(value: f64) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Float(value),
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Pow]),
-            }
+        Self::new(
+            ObjectValue::Float(value),
+            Environment::new_builtins(&[BuiltinFunction::Pow]),
         )
     }
 
     pub fn new_boolean(value: bool) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Boolean(value),
-                associated_env: Environment::new_builtins(&[]),
-            }
+        Self::new(
+            ObjectValue::Boolean(value),
+            Environment::new_builtins(&[]),
         )
     }
 
     pub fn new_string(value: String) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::String(value),
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Len]),
-            }
+        Self::new(
+            ObjectValue::String(value),
+            Environment::new_builtins(&[BuiltinFunction::Len]),
         )
     }
 
     pub fn new_null() -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Null,
-                associated_env: Environment::new_builtins(&[]),
-            }
+        Self::new(
+            ObjectValue::Null,
+            Environment::new_builtins(&[]),
         )
     }
 
     pub fn new_list(value: Vec<Object>) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::List(value),
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Len]),
-            }
+        Self::new(
+            ObjectValue::List(value),
+            Environment::new_builtins(&[BuiltinFunction::Len]),
         )
     }
 
     pub fn new_map(value: HashMap<Object, Object>) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Map(value),
-                associated_env: Environment::new_builtins(&[BuiltinFunction::Len]),
-            }
+        Self::new(
+            ObjectValue::Map(value),
+            Environment::new_builtins(&[BuiltinFunction::Len]),
         )
     }
 
     pub fn new_butlin_function(value: BuiltinFunction) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::BuiltinFunction(value),
-                associated_env: Environment::new_builtins(&[]),
-            }
+        Self::new(
+            ObjectValue::BuiltinFunction(value),
+            Environment::new_builtins(&[]),
         )
     }
 
-    pub fn new_function(parameters: Vec<Node>, body: Box<Node>, env: Environment) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::Function {
-                    parameters,
-                    body,
-                    env: Box::new(env),
-                },
-                associated_env: Environment::new_builtins(&[]),
-            }
+    pub fn new_function(parameters: Vec<Node>, body: Box<Node>, env: &Rc<RefCell<Environment>>) -> Object {
+        Self::new(
+            ObjectValue::Function {
+                parameters,
+                body,
+                env: Rc::clone(env),
+            },
+            Environment::new_builtins(&[]),
         )
     }
 
     // pub fn new_reference(value: Rc<RefCell<Object>>) -> Object {
-    //     Self::set_self_in_assoc_env(
-    //         Object {
-    //             value: ObjectValue::Reference(value),
-    //             associated_env: Environment::new_builtins(&[]),
-    //         }
+    //     Self::new(
+    //         ObjectValue::Reference(value),
+    //         Environment::new_builtins(&[]),
     //     )
     // }
 
     pub fn new_return_value(value: Object) -> Object {
-        Self::set_self_in_assoc_env(
-            Object {
-                value: ObjectValue::ReturnValue(Box::new(value)),
-                associated_env: Environment::new_builtins(&[]),
-            }
+        Self::new(
+            ObjectValue::ReturnValue(Box::new(value)),
+            Environment::new_builtins(&[]),
         )
     }
 }
@@ -279,7 +253,7 @@ pub enum ObjectValue {
     Function {
         parameters: Vec<Node>,
         body: Box<Node>,
-        env: Box<Environment>,
+        env: Rc<RefCell<Environment>>,
     },
     BuiltinFunction(BuiltinFunction),
     // Reference(Rc<RefCell<Object>>),
@@ -292,7 +266,7 @@ pub enum ObjectValue {
 #[derive(PartialEq, Debug, Clone)]
 pub struct Environment {
     map: HashMap<String, Object>,
-    outer: Option<Box<Environment>>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -300,10 +274,10 @@ impl Environment {
         Environment::new_builtins(&BuiltinFunction::EXPORTS)
     }
 
-    pub fn new_enclosed(outer: Box<Environment>) -> Self {
+    pub fn new_enclosed(outer: &Rc<RefCell<Environment>>) -> Self {
         Environment {
             map: HashMap::new(),
-            outer: Some(outer),
+            outer: Some(Rc::clone(outer)),
         }
     }
 
@@ -317,28 +291,25 @@ impl Environment {
         Environment { map, outer: None }
     }
 
+    pub fn to_ref(self) -> Rc<RefCell<Environment>> {
+        Rc::new(RefCell::new(self))
+    }
+
     pub fn set(&mut self, identifier: String, value: Object) {
         self.map.insert(identifier, value);
     }
 
-    pub fn get(&self, identifier: &String) -> Option<&Object> {
-        let mut obj = self.map.get(identifier);
-        if obj.is_none()
-            && let Some(outer) = &self.outer
-        {
-            obj = outer.get(identifier);
+    pub fn get(&self, identifier: &String) -> Option<Object> {
+        match self.map.get(identifier) {
+            Some(obj) => Some(obj.clone()),
+            None => {
+                if let Some(outer) = &self.outer {
+                    outer.borrow().get(identifier)
+                } else {
+                    None
+                }
+            }
         }
-        obj
-    }
-
-    pub fn get_mut(&mut self, identifier: &String) -> Option<&mut Object> {
-        let mut obj = self.map.get_mut(identifier);
-        if obj.is_none()
-            && let Some(outer) = &mut self.outer
-        {
-            obj = outer.get_mut(identifier);
-        }
-        obj
     }
 }
 
