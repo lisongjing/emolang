@@ -1,9 +1,9 @@
-use std::io::{self, Write};
+use std::{io::{self, Write}, rc::Rc};
 
 use crate::{evaluator::eval, lexer::Lexer, parser::Parser, types::Environment};
 
 pub fn start() {
-    let mut env = Environment::new_default();
+    let env = Environment::new_default().to_ref();
     loop {
         print!(">> ");
         io::stdout()
@@ -22,7 +22,7 @@ pub fn start() {
             continue;
         }
 
-        match eval(&program, &mut env) {
+        match eval(&program, Rc::clone(&env)) {
             Ok(evaluated) => println!("{}", evaluated.inspect()),
             Err(error) => println!("Evaluator error:\n\t{error}"),
         }
