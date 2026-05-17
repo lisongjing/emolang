@@ -167,6 +167,7 @@ fn eval_list_literal(elements: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Res
     Ok(Object::new_list(value))
 }
 
+#[allow(clippy::mutable_key_type)]
 fn eval_map_literal(entries: &Vec<(Node, Node)>, env: Rc<RefCell<Environment>>) -> Result<Object, String> {
     let mut value = HashMap::new();
     for (key, val) in entries {

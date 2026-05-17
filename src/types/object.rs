@@ -150,7 +150,7 @@ impl Object {
     }
 
     pub fn associated_env(&self) -> Rc<RefCell<Environment>> {
-        &self.associated_env.borrow_mut().set("🈯".to_string(), self.clone());
+        self.associated_env.borrow_mut().set("🈯".to_string(), self.clone());
         Rc::clone(&self.associated_env)
     }
 
@@ -200,6 +200,7 @@ impl Object {
         )
     }
 
+    #[allow(clippy::mutable_key_type)]
     pub fn new_map(value: HashMap<Object, Object>) -> Object {
         Self::new(
             ObjectValue::Map(value),
