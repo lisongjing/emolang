@@ -66,8 +66,6 @@ impl Parser {
         self.prefix_exp_parsers
             .insert(TokenType::While, Rc::new(|p| p.parse_while_expression()));
         self.prefix_exp_parsers
-            .insert(TokenType::Break, Rc::new(|p| p.parse_break_expression()));
-        self.prefix_exp_parsers
             .insert(TokenType::Function, Rc::new(|p| p.parse_function_literal()));
 
         self.prefix_exp_parsers.insert(
@@ -163,6 +161,7 @@ impl Parser {
     fn parse_statement(&mut self) -> Result<Node, String> {
         match self.tokens.current().unwrap().token_type {
             TokenType::Return => self.parse_return_statement(),
+            TokenType::Break => self.parse_break_statement(),
             TokenType::Semicolon => {
                 self.tokens.to_next();
                 self.parse_statement()
@@ -184,6 +183,25 @@ impl Parser {
         Ok(Node::ReturnStatement {
             value,
         })
+    }
+
+    fn parse_break_statement(&mut self) -> Result<Node, String> {
+        let token = self.tokens.to_next();
+
+        let value = if token.is_some_and(|tok| tok.token_type != TokenType::Semicolon) {
+            Some(Box::new(self.parse_expression(Precedence::Lowest)?))
+        } else {
+            None
+        };
+
+        while self
+            .tokens
+            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
+        {
+            self.tokens.to_next();
+        }
+
+        Ok(Node::BreakStatement { value })
     }
 
     fn parse_expression_statement(&mut self) -> Result<Node, String> {
@@ -508,18 +526,6 @@ impl Parser {
             condition,
             body,
         })
-    }
-
-    fn parse_break_expression(&mut self) -> Result<Node, String> {
-        let token = self.tokens.to_next();
-
-        let value = if token.is_some_and(|tok| tok.token_type != TokenType::Semicolon) {
-            Some(Box::new(self.parse_expression(Precedence::Lowest)?))
-        } else {
-            None
-        };
-
-        Ok(Node::BreakExpression { value })
     }
 
     fn parse_function_literal(&mut self) -> Result<Node, String> {

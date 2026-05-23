@@ -52,6 +52,9 @@ pub enum Node {
     ReturnStatement {
         value: Box<Node>,
     },
+    BreakStatement {
+        value: Option<Box<Node>>,
+    },
     ExpressionStatement {
         expression: Box<Node>,
     },
@@ -106,9 +109,6 @@ pub enum Node {
         condition: Box<Node>,
         body: Box<Node>,
     },
-    BreakExpression {
-        value: Option<Box<Node>>,
-    },
     FunctionLiteral {
         name: Option<Box<Node>>,
         parameters: Vec<Node>,
@@ -131,6 +131,12 @@ impl Node {
             Node::ReturnStatement { value } => {
                 format!("🔙 {} ↙️", value.string())
             }
+            Node::BreakStatement { value } => format!(
+                "🔚{}",
+                value
+                    .as_ref()
+                    .map_or(String::new(), |v| format!(" {}", v.string()))
+            ),
             Node::ExpressionStatement { expression } => {
                 format!("{} ↙️", expression.string())
             }
@@ -194,12 +200,6 @@ impl Node {
             Node::WhileExpression { condition, body } => {
                 format!("⭕ {} {}", condition.string(), body.string(),)
             }
-            Node::BreakExpression { value } => format!(
-                "🔚{}",
-                value
-                    .as_ref()
-                    .map_or(String::new(), |v| format!(" {}", v.string()))
-            ),
             Node::FunctionLiteral {
                 name,
                 parameters,
