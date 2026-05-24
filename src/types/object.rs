@@ -239,6 +239,13 @@ impl Object {
             Environment::new_builtins(&[]),
         )
     }
+
+    pub fn new_break(value: Option<Box<Object>>) -> Object {
+        Self::new(
+            ObjectValue::Break(value),
+            Environment::new_builtins(&[]),
+        )
+    }
 }
 
 

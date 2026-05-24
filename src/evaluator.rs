@@ -30,7 +30,7 @@ pub fn eval(node: &Node, env: Rc<RefCell<Environment>>) -> Result<Object, String
             alternative,
         } => eval_if_expression(condition, consequence, alternative, env),
         Node::WhileExpression { condition, body } => eval_while_expression(condition, body, env),
-        Node::BreakExpression { value } => eval_break_expression(value, env),
+        Node::BreakStatement { value } => eval_break_statement(value, env),
         Node::ReturnStatement { value } => Ok(Object::new_return_value(eval(value, env)?)),
         Node::AssignExpression { identifier, value } => {
             eval_assign_expression(identifier, value, env)
@@ -69,15 +69,17 @@ fn eval_program(statements: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Result
     let mut obj = Object::new_null();
     for statement in statements {
         obj = eval(statement, Rc::clone(&env))?;
-        if let ObjectValue::ReturnValue(value) = obj.value()
-        {
+        if let ObjectValue::ReturnValue(value) = obj.value() {
             return Ok(*value.clone());
         }
     }
     Ok(obj)
 }
 
-fn eval_block_statements(statements: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Result<Object, String> {
+fn eval_block_statements(
+    statements: &Vec<Node>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
     if statements.is_empty() {
         return Err(String::from("Empty statements to evaluate values"));
     }
@@ -85,8 +87,10 @@ fn eval_block_statements(statements: &Vec<Node>, env: Rc<RefCell<Environment>>) 
     let mut obj = Object::new_null();
     for statement in statements {
         obj = eval(statement, Rc::clone(&env))?;
-        if let ObjectValue::ReturnValue(_) = obj.value()
-        {
+        if let ObjectValue::ReturnValue(_) = obj.value() {
+            return Ok(obj);
+        }
+        if let ObjectValue::Break(_) = obj.value() {
             return Ok(obj);
         }
     }
@@ -115,7 +119,8 @@ fn eval_assign_expression(
                         if let Some(element) = elements.get_mut(*index as usize) {
                             *element = value_object.clone();
                             if let Node::Identifier { value } = &**collection {
-                                env.borrow_mut().set(value.clone(), Object::new_list(elements));
+                                env.borrow_mut()
+                                    .set(value.clone(), Object::new_list(elements));
                             }
                             Ok(value_object)
                         } else {
@@ -131,7 +136,8 @@ fn eval_assign_expression(
                     if let Some(element) = entries.get_mut(&index_object) {
                         *element = value_object.clone();
                         if let Node::Identifier { value } = &**collection {
-                            env.borrow_mut().set(value.clone(), Object::new_map(entries));
+                            env.borrow_mut()
+                                .set(value.clone(), Object::new_map(entries));
                         }
                         Ok(value_object)
                     } else {
@@ -159,7 +165,10 @@ fn eval_assign_expression(
     }
 }
 
-fn eval_list_literal(elements: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Result<Object, String> {
+fn eval_list_literal(
+    elements: &Vec<Node>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
     let mut value = vec![];
     for node in elements {
         value.push(eval(node, Rc::clone(&env))?);
@@ -168,7 +177,10 @@ fn eval_list_literal(elements: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Res
 }
 
 #[allow(clippy::mutable_key_type)]
-fn eval_map_literal(entries: &Vec<(Node, Node)>, env: Rc<RefCell<Environment>>) -> Result<Object, String> {
+fn eval_map_literal(
+    entries: &Vec<(Node, Node)>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
     let mut value = HashMap::new();
     for (key, val) in entries {
         value.insert(eval(key, Rc::clone(&env))?, eval(val, Rc::clone(&env))?);
@@ -215,11 +227,7 @@ fn eval_prefix_minus_expression(obj: &Object) -> Result<Object, String> {
     }
 }
 
-fn eval_infix_expression(
-    operator: &str,
-    left: &Object,
-    right: &Object,
-) -> Result<Object, String> {
+fn eval_infix_expression(operator: &str, left: &Object, right: &Object) -> Result<Object, String> {
     if let ObjectValue::Integer(left) = left.value()
         && let ObjectValue::Integer(right) = right.value()
     {
@@ -260,11 +268,7 @@ fn eval_infix_expression(
     }
 }
 
-fn eval_integer_infix_expression(
-    operator: &str,
-    left: i64,
-    right: i64,
-) -> Result<Object, String> {
+fn eval_integer_infix_expression(operator: &str, left: i64, right: i64) -> Result<Object, String> {
     match operator {
         "➕" => Ok(Object::new_integer(left + right)),
         "➖" => Ok(Object::new_integer(left - right)),
@@ -312,11 +316,7 @@ fn eval_boolean_infix_expression(
     }
 }
 
-fn eval_string_infix_expression(
-    operator: &str,
-    left: &str,
-    right: &str,
-) -> Result<Object, String> {
+fn eval_string_infix_expression(operator: &str, left: &str, right: &str) -> Result<Object, String> {
     match operator {
         "➕" => {
             let mut join = String::from(left);
@@ -398,23 +398,29 @@ fn eval_while_expression(
     body: &Node,
     env: Rc<RefCell<Environment>>,
 ) -> Result<Object, String> {
+    let mut return_val = Object::new_null();
     while eval_condition(condition, Rc::clone(&env))? {
-        eval(body, Rc::clone(&env))?;
+        let body_obj = eval(body, Rc::clone(&env))?;
+        if let ObjectValue::Break(value) = body_obj.value() {
+            if let Some(obj) = value {
+                return_val = *obj.clone();
+            }
+            break;
+        }
     }
-    Ok(Object::new_null())
+    Ok(return_val)
 }
 
-fn eval_break_expression(
-    _break_value: &Option<Box<Node>>,
-    _env: Rc<RefCell<Environment>>,
+fn eval_break_statement(
+    break_value: &Option<Box<Node>>,
+    env: Rc<RefCell<Environment>>,
 ) -> Result<Object, String> {
-    // let value = if let Some(value) = break_value {
-    //     Some(Box::new(eval(*value, env)?))
-    // } else {
-    //     None
-    // };
-    // Ok(Object::new_break(value))
-    Ok(Object::new_null())
+    let value = if let Some(value) = break_value {
+        Some(Box::new(eval(value, env)?))
+    } else {
+        None
+    };
+    Ok(Object::new_break(value))
 }
 
 fn eval_condition(condition: &Node, env: Rc<RefCell<Environment>>) -> Result<bool, String> {
@@ -431,7 +437,10 @@ fn eval_identifier(value: &String, env: Rc<RefCell<Environment>>) -> Result<Obje
         .ok_or_else(|| format!("identifier not found: {value}"))
 }
 
-fn eval_expressions(arguments: &Vec<Node>, env: Rc<RefCell<Environment>>) -> Result<Vec<Object>, String> {
+fn eval_expressions(
+    arguments: &Vec<Node>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Vec<Object>, String> {
     let mut args = vec![];
     for arg in arguments {
         args.push(eval(arg, Rc::clone(&env))?);
@@ -483,7 +492,10 @@ fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String>
             let mut arg_iter = args.into_iter();
             for param in parameters.into_iter() {
                 if let Node::Identifier { value } = param {
-                    env.set(value, arg_iter.next().ok_or(String::from("miss parameter"))?);
+                    env.set(
+                        value,
+                        arg_iter.next().ok_or(String::from("miss parameter"))?,
+                    );
                 } else {
                     return Err(format!("Not a identifier: {}", param.string()));
                 }
