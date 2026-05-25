@@ -30,6 +30,7 @@ pub fn eval(node: &Node, env: Rc<RefCell<Environment>>) -> Result<Object, String
             alternative,
         } => eval_if_expression(condition, consequence, alternative, env),
         Node::WhileExpression { condition, body } => eval_while_expression(condition, body, env),
+        Node::ContinueStatement => Ok(Object::new_continue()),
         Node::BreakStatement { value } => eval_break_statement(value, env),
         Node::ReturnStatement { value } => Ok(Object::new_return_value(eval(value, env)?)),
         Node::AssignExpression { identifier, value } => {
@@ -91,6 +92,9 @@ fn eval_block_statements(
             return Ok(obj);
         }
         if let ObjectValue::Break(_) = obj.value() {
+            return Ok(obj);
+        }
+        if let ObjectValue::Continue = obj.value() {
             return Ok(obj);
         }
     }
@@ -406,6 +410,8 @@ fn eval_while_expression(
                 return_val = *obj.clone();
             }
             break;
+        } else if let ObjectValue::Continue = body_obj.value() {
+            continue;
         }
     }
     Ok(return_val)

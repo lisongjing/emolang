@@ -246,6 +246,13 @@ impl Object {
             Environment::new_builtins(&[]),
         )
     }
+
+    pub fn new_continue() -> Object {
+        Self::new(
+            ObjectValue::Continue,
+            Environment::new_builtins(&[]),
+        )
+    }
 }
 
 

@@ -55,6 +55,7 @@ pub enum Node {
     BreakStatement {
         value: Option<Box<Node>>,
     },
+    ContinueStatement,
     ExpressionStatement {
         expression: Box<Node>,
     },
@@ -132,11 +133,12 @@ impl Node {
                 format!("🔙 {} ↙️", value.string())
             }
             Node::BreakStatement { value } => format!(
-                "🔚{}",
+                "🔚{} ↙️",
                 value
                     .as_ref()
                     .map_or(String::new(), |v| format!(" {}", v.string()))
             ),
+            Node::ContinueStatement => "🔜 ↙️".to_string(),
             Node::ExpressionStatement { expression } => {
                 format!("{} ↙️", expression.string())
             }

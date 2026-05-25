@@ -162,6 +162,7 @@ impl Parser {
         match self.tokens.current().unwrap().token_type {
             TokenType::Return => self.parse_return_statement(),
             TokenType::Break => self.parse_break_statement(),
+            TokenType::Continue => self.parse_continue_statement(),
             TokenType::Semicolon => {
                 self.tokens.to_next();
                 self.parse_statement()
@@ -202,6 +203,17 @@ impl Parser {
         }
 
         Ok(Node::BreakStatement { value })
+    }
+
+    fn parse_continue_statement(&mut self) -> Result<Node, String> {
+        while self
+            .tokens
+            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
+        {
+            self.tokens.to_next();
+        }
+
+        Ok(Node::ContinueStatement)
     }
 
     fn parse_expression_statement(&mut self) -> Result<Node, String> {
