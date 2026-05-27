@@ -84,6 +84,15 @@ pub enum Node {
     MapLiteral {
         entries: Vec<(Node, Node)>,
     },
+    FunctionLiteral {
+        name: Option<Box<Node>>,
+        parameters: Vec<Node>,
+        body: Box<Node>,
+    },
+    StructLiteral {
+        name: Box<Node>,
+        properties: Vec<Node>,
+    },
     PrefixExpression {
         operator: String,
         right: Box<Node>,
@@ -108,11 +117,6 @@ pub enum Node {
     },
     WhileExpression {
         condition: Box<Node>,
-        body: Box<Node>,
-    },
-    FunctionLiteral {
-        name: Option<Box<Node>>,
-        parameters: Vec<Node>,
         body: Box<Node>,
     },
     CallExpression {
@@ -170,6 +174,33 @@ impl Node {
                     .collect::<Vec<String>>()
                     .join("🦶 ")
             ),
+            Node::FunctionLiteral {
+                name,
+                parameters,
+                body,
+            } => format!(
+                "📛 {}🌜{}🌛 {}",
+                name.as_ref()
+                    .map_or(String::new(), |ident| ident.string() + " "),
+                parameters
+                    .iter()
+                    .map(|ident| ident.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 "),
+                body.string(),
+            ),
+            Node::StructLiteral {
+                name,
+                properties,
+            } => format!(
+                "🔠 {} 🫸 {} 🫷",
+                name.string(),
+                properties
+                    .iter()
+                    .map(|ident| ident.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 "),
+            ),
             Node::PrefixExpression { operator, right } => {
                 format!("🌜{}{}🌛", operator, right.string())
             }
@@ -202,21 +233,6 @@ impl Node {
             Node::WhileExpression { condition, body } => {
                 format!("⭕ {} {}", condition.string(), body.string(),)
             }
-            Node::FunctionLiteral {
-                name,
-                parameters,
-                body,
-            } => format!(
-                "📛 {}🌜{}🌛 {}",
-                name.as_ref()
-                    .map_or(String::new(), |ident| ident.string() + " "),
-                parameters
-                    .iter()
-                    .map(|ident| ident.string())
-                    .collect::<Vec<String>>()
-                    .join("🦶 "),
-                body.string(),
-            ),
             Node::CallExpression {
                 function,
                 arguments,
