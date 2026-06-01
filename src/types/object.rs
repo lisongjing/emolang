@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell, collections::HashMap, hash::Hash, rc::Rc
+    cell::RefCell, collections::{HashMap, hash_map::Iter}, hash::Hash, rc::Rc
 };
 
 use ordered_float::OrderedFloat;
@@ -56,6 +56,13 @@ impl Hash for Object {
                     value.hash(state);
                 }
             }
+            ObjectValue::Struct => {
+                8u32.hash(state);
+                for (key, value) in self.associated_env.borrow().entries() {
+                    key.hash(state);
+                    value.hash(state);
+                }
+            }
             ObjectValue::Function {
                 parameters: _,
                 body,
@@ -65,25 +72,25 @@ impl Hash for Object {
                 body.string().hash(state);
             }
             ObjectValue::BuiltinFunction(value) => {
-                8u32.hash(state);
+                9u32.hash(state);
                 value.name().hash(state);
             }
             // ObjectValue::Reference(value) => {
-            //     9u32.hash(state);
+            //     10u32.hash(state);
             //     value.borrow().hash(state);
             // }
             ObjectValue::ReturnValue(value) => {
-                10u32.hash(state);
+                11u32.hash(state);
                 value.hash(state);
             }
             ObjectValue::Break(value) => {
-                11u32.hash(state);
+                12u32.hash(state);
                 if let Some(val) = value {
                     val.hash(state);
                 }
             }
             ObjectValue::Continue => {
-                12u32.hash(state);
+                13u32.hash(state);
             }
         }
     }
@@ -110,6 +117,15 @@ impl Object {
                 val
                     .iter()
                     .map(|(k, v)| format!("{}: {}", k.inspect(), v.inspect()))
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            ),
+            ObjectValue::Struct => format!(
+                "struct {{{}}}",
+                self.associated_env
+                    .borrow()
+                    .entries()
+                    .map(|(k, v)| format!("{}: {}", k, v.inspect()))
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
@@ -265,6 +281,7 @@ pub enum ObjectValue {
     Null,
     List(Vec<Object>),
     Map(HashMap<Object, Object>),
+    Struct,
     Function {
         parameters: Vec<Node>,
         body: Box<Node>,
@@ -325,6 +342,10 @@ impl Environment {
                 }
             }
         }
+    }
+
+    pub fn entries(&self) -> Iter<'_, String, Object> {
+        self.map.iter()
     }
 }
 
