@@ -294,6 +294,38 @@ pub enum ObjectValue {
     Continue,
 }
 
+pub enum ObjectType {
+    Integer,
+    Float,
+    Boolean,
+    String,
+    List,
+    Map,
+    Struct {
+        name: Option<String>,
+        properties: HashMap<String, ObjectType>,
+    },
+    Function {
+        name: Option<String>,
+        parameters: HashMap<String, ObjectType>,
+        return_type: Box<ObjectType>,
+    },
+    Null,
+    Any,
+}
+
+impl ObjectType {
+    pub fn is_primitive_type(&self) -> bool {
+        match self {
+            ObjectType::Integer | ObjectType::Float |
+            ObjectType::Boolean | ObjectType::String |
+            ObjectType::Null => true,
+            _ => false,
+            
+        }
+    }
+}
+
 
 #[derive(PartialEq, Debug, Clone)]
 pub struct Environment {
