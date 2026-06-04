@@ -57,7 +57,7 @@ impl Hash for Object {
                 }
             }
             ObjectValue::Struct => {
-                8u32.hash(state);
+                7u32.hash(state);
                 for (key, value) in self.associated_env.borrow().entries() {
                     key.hash(state);
                     value.hash(state);
@@ -68,7 +68,7 @@ impl Hash for Object {
                 body,
                 env: _,
             } => {
-                7u32.hash(state);
+                8u32.hash(state);
                 body.string().hash(state);
             }
             ObjectValue::BuiltinFunction(value) => {
@@ -79,18 +79,22 @@ impl Hash for Object {
             //     10u32.hash(state);
             //     value.borrow().hash(state);
             // }
-            ObjectValue::ReturnValue(value) => {
+            ObjectValue::CustomTypeDefinition { name, properties: _ } => {
                 11u32.hash(state);
+                name.hash(state);
+            }
+            ObjectValue::ReturnValue(value) => {
+                12u32.hash(state);
                 value.hash(state);
             }
             ObjectValue::Break(value) => {
-                12u32.hash(state);
+                13u32.hash(state);
                 if let Some(val) = value {
                     val.hash(state);
                 }
             }
             ObjectValue::Continue => {
-                13u32.hash(state);
+                14u32.hash(state);
             }
         }
     }
@@ -147,6 +151,7 @@ impl Object {
                 val.name()
             ),
             // ObjectValue::Reference(val) => val.borrow().inspect(),
+            ObjectValue::CustomTypeDefinition { name, properties: _ } => format!("type {}", name.clone().unwrap_or("anonymous".to_string())),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -249,6 +254,13 @@ impl Object {
     //     )
     // }
 
+    pub fn new_custom_type_definition(name: Option<String>, properties: HashMap<String, ObjectType>) -> Object {
+        Self::new(
+            ObjectValue::CustomTypeDefinition { name, properties },
+            Environment::new_builtins(&[]),
+        )
+    }
+
     pub fn new_return_value(value: Object) -> Object {
         Self::new(
             ObjectValue::ReturnValue(Box::new(value)),
@@ -289,11 +301,16 @@ pub enum ObjectValue {
     },
     BuiltinFunction(BuiltinFunction),
     // Reference(Rc<RefCell<Object>>),
+    CustomTypeDefinition {
+        name: Option<String>,
+        properties: HashMap<String, ObjectType>,
+    },
     ReturnValue(Box<Object>),
     Break(Option<Box<Object>>),
     Continue,
 }
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum ObjectType {
     Integer,
     Float,
@@ -316,13 +333,9 @@ pub enum ObjectType {
 
 impl ObjectType {
     pub fn is_primitive_type(&self) -> bool {
-        match self {
-            ObjectType::Integer | ObjectType::Float |
-            ObjectType::Boolean | ObjectType::String |
-            ObjectType::Null => true,
-            _ => false,
-            
-        }
+        matches!(self,
+            ObjectType::Integer | ObjectType::Float | ObjectType::Boolean |
+            ObjectType::String | ObjectType::Null)
     }
 }
 

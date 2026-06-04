@@ -89,7 +89,7 @@ pub enum Node {
         parameters: Vec<Node>,
         body: Box<Node>,
     },
-    StructLiteral {
+    StructDefinition {
         name: Box<Node>,
         properties: Vec<Node>,
     },
@@ -189,10 +189,7 @@ impl Node {
                     .join("🦶 "),
                 body.string(),
             ),
-            Node::StructLiteral {
-                name,
-                properties,
-            } => format!(
+            Node::StructDefinition { name, properties } => format!(
                 "🔠 {} 🫸 {} 🫷",
                 name.string(),
                 properties
