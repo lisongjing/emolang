@@ -68,7 +68,7 @@ impl Parser {
         self.prefix_exp_parsers
             .insert(TokenType::Function, Rc::new(|p| p.parse_function_literal()));
         self.prefix_exp_parsers
-            .insert(TokenType::Struct, Rc::new(|p| p.parse_struct_literal()));
+            .insert(TokenType::Struct, Rc::new(|p| p.parse_struct_definition()));
 
         self.prefix_exp_parsers.insert(
             TokenType::LParenthesis,
@@ -130,7 +130,7 @@ impl Parser {
 
         self.infix_exp_parsers.insert(
             TokenType::LBracket,
-            Rc::new(|p, left| p.parse_index_expression(left))
+            Rc::new(|p, left| p.parse_index_expression(left)),
         );
         self.infix_exp_parsers.insert(
             TokenType::LParenthesis,
@@ -168,7 +168,7 @@ impl Parser {
             TokenType::Semicolon => {
                 self.tokens.to_next();
                 self.parse_statement()
-            },
+            }
             _ => self.parse_expression_statement(),
         }
     }
@@ -183,9 +183,7 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Node::ReturnStatement {
-            value,
-        })
+        Ok(Node::ReturnStatement { value })
     }
 
     fn parse_break_statement(&mut self) -> Result<Node, String> {
@@ -228,9 +226,7 @@ impl Parser {
             self.tokens.to_next();
         }
 
-        Ok(Node::ExpressionStatement {
-            expression,
-        })
+        Ok(Node::ExpressionStatement { expression })
     }
 
     fn parse_block_statement(&mut self) -> Result<Node, String> {
@@ -308,11 +304,7 @@ impl Parser {
     }
 
     fn parse_bool_literal(&self) -> Result<Node, String> {
-        let value = TokenType::True == self
-            .tokens
-            .current()
-            .unwrap()
-            .token_type;
+        let value = TokenType::True == self.tokens.current().unwrap().token_type;
         Ok(Node::BooleanLiteral { value })
     }
 
@@ -342,10 +334,14 @@ impl Parser {
             }
         }
         if !has_prefix {
-            return Err(String::from("Expected 🗨️ or 💬 at the start of a string literal"));
+            return Err(String::from(
+                "Expected 🗨️ or 💬 at the start of a string literal",
+            ));
         }
         if !has_suffix {
-            return Err(String::from("Expected 🗨️ or 💬 at the end of a string literal"));
+            return Err(String::from(
+                "Expected 🗨️ or 💬 at the end of a string literal",
+            ));
         }
 
         Ok(Node::StringLiteral { value })
@@ -421,30 +417,17 @@ impl Parser {
     }
 
     fn parse_prefix_expression(&mut self) -> Result<Node, String> {
-        let operator = self
-            .tokens
-            .current()
-            .unwrap()
-            .literal
-            .clone();
+        let operator = self.tokens.current().unwrap().literal.clone();
         if self.tokens.to_next().is_some() {
             let right = Box::new(self.parse_expression(Precedence::Prefix)?);
-            Ok(Node::PrefixExpression {
-                operator,
-                right,
-            })
+            Ok(Node::PrefixExpression { operator, right })
         } else {
             Err(format!("Expected a expression after operator {}", operator))
         }
     }
 
     fn parse_infix_expression(&mut self, left: Node) -> Result<Node, String> {
-        let operator = self
-            .tokens
-            .current()
-            .unwrap()
-            .literal
-            .clone();
+        let operator = self.tokens.current().unwrap().literal.clone();
         let precedence = Precedence::get_operator_precedence(self.tokens.current().unwrap());
         self.tokens.to_next();
         let right = Box::new(self.parse_expression(precedence)?);
@@ -461,7 +444,7 @@ impl Parser {
 
         Ok(Node::AssignExpression {
             identifier: Box::new(identifier),
-            value
+            value,
         })
     }
 
@@ -536,43 +519,63 @@ impl Parser {
         self.tokens.to_next();
         let body = Box::new(self.parse_block_statement()?);
 
-        Ok(Node::WhileExpression {
-            condition,
-            body,
-        })
+        Ok(Node::WhileExpression { condition, body })
     }
 
     fn parse_function_literal(&mut self) -> Result<Node, String> {
         let mut name = None;
         let mut parameters = vec![];
 
-        if self.tokens.is_next_match(|token| token.token_type == TokenType::Identifier) {
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type == TokenType::Identifier)
+        {
             self.tokens.to_next();
             name = Some(Box::new(self.parse_identifier()?));
         }
 
-        if self.tokens.is_next_match(|token| token.token_type != TokenType::LParenthesis) {
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::LParenthesis)
+        {
             return Err("Expected a left parenthesis".to_string());
         }
 
         self.tokens.to_next();
-        
-        while let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis) {
+
+        while let Some(token) = self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RParenthesis)
+        {
             if token.token_type != TokenType::Identifier {
-                return Err(format!("Expected a identifier, but got a {}", token.literal));
+                return Err(format!(
+                    "Expected a identifier, but got a {}",
+                    token.literal
+                ));
             }
             parameters.push(self.parse_identifier()?);
 
-            if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RParenthesis)
+            {
                 continue;
             }
 
-            if let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::Comma) {
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
                 return Err(format!("Expected a comma, but got a {}", token.literal));
             }
         }
 
-        if self.tokens.is_next_match(|token| token.token_type != TokenType::LBrace) {
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::LBrace)
+        {
             return Err("Expected a left brace".to_string());
         }
 
@@ -586,44 +589,74 @@ impl Parser {
         })
     }
 
-    fn parse_struct_literal(&mut self) -> Result<Node, String> {
-
-        if self.tokens.is_next_match(|token| token.token_type != TokenType::Identifier) {
+    fn parse_struct_definition(&mut self) -> Result<Node, String> {
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::Identifier)
+        {
             return Err("Expected a identifier".to_string());
         }
-        
+
         self.tokens.to_next();
         let name = Box::new(self.parse_identifier()?);
 
-        if self.tokens.is_next_match(|token| token.token_type != TokenType::LBrace) {
+        if self
+            .tokens
+            .is_next_match(|token| token.token_type != TokenType::LBrace)
+        {
             return Err("Expected a left brace".to_string());
         }
 
         self.tokens.to_next();
 
         let mut properties = vec![];
-        while let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::RBrace) {
+        while let Some(token) = self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RBrace)
+        {
+            if token.token_type == TokenType::Semicolon {
+                continue;
+            }
             if token.token_type != TokenType::Identifier {
-                return Err(format!("Expected a identifier, but got a {}", token.literal));
+                return Err(format!(
+                    "Expected a identifier, but got a {}",
+                    token.literal
+                ));
             }
             properties.push(self.parse_identifier()?);
 
-            if self.tokens.is_next_match(|token| token.token_type == TokenType::RBrace) {
+            while self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::Semicolon) {
+                self.tokens.to_next();
+            }
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RBrace)
+            {
                 continue;
             }
 
-            if let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::Comma) {
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
                 return Err(format!("Expected a comma, but got a {}", token.literal));
             }
         }
 
-        Ok(Node::StructLiteral { name, properties })
+        Ok(Node::StructDefinition { name, properties })
     }
 
     fn parse_index_expression(&mut self, list: Node) -> Result<Node, String> {
         self.tokens.to_next();
         let index = self.parse_expression(Precedence::Lowest)?;
-        if let Some(tok) = self.tokens.to_next() && tok.token_type == TokenType::RBracket {
+        if let Some(tok) = self.tokens.to_next()
+            && tok.token_type == TokenType::RBracket
+        {
             Ok(Node::IndexExpression {
                 collection: Box::new(list),
                 index: Box::new(index),
@@ -636,14 +669,26 @@ impl Parser {
     fn parse_call_expression(&mut self, function: Node) -> Result<Node, String> {
         let mut arguments = vec![];
 
-        while self.tokens.to_next().filter(|token| token.token_type != TokenType::RParenthesis).is_some() {
+        while self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RParenthesis)
+            .is_some()
+        {
             arguments.push(self.parse_expression(Precedence::Lowest)?);
 
-            if self.tokens.is_next_match(|token| token.token_type == TokenType::RParenthesis) {
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RParenthesis)
+            {
                 continue;
             }
 
-            if let Some(token) = self.tokens.to_next().filter(|token| token.token_type != TokenType::Comma) {
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
                 return Err(format!("Expected a comma, but got a {}", token.literal));
             }
         }
@@ -660,11 +705,17 @@ impl Parser {
                 let identifier = Node::Identifier {
                     value: token.literal.clone(),
                 };
-                if self.tokens.is_next_match(|tok| tok.token_type == TokenType::LParenthesis) {
+                if self
+                    .tokens
+                    .is_next_match(|tok| tok.token_type == TokenType::LParenthesis)
+                {
                     // method
                     self.tokens.to_next();
                     self.parse_call_expression(identifier)?
-                } else if self.tokens.is_next_match(|tok| tok.token_type == TokenType::LBracket) {
+                } else if self
+                    .tokens
+                    .is_next_match(|tok| tok.token_type == TokenType::LBracket)
+                {
                     // index expression
                     self.tokens.to_next();
                     self.parse_index_expression(identifier)?
@@ -673,13 +724,21 @@ impl Parser {
                     identifier
                 }
             } else {
-                return Err(format!("Expected a identifier, but got a {}", token.literal))
+                return Err(format!(
+                    "Expected a identifier, but got a {}",
+                    token.literal
+                ));
             }
         } else {
-            return Err(String::from("Expected a identifier, but arrived at the end"))
+            return Err(String::from(
+                "Expected a identifier, but arrived at the end",
+            ));
         };
 
-        Ok(Node::MemberExpression { instance: Box::new(instance), member: Box::new(member) })
+        Ok(Node::MemberExpression {
+            instance: Box::new(instance),
+            member: Box::new(member),
+        })
     }
 }
 
