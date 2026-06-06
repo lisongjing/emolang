@@ -48,6 +48,7 @@ pub fn eval(node: &Node, env: Rc<RefCell<Environment>>) -> Result<Object, String
             }
             Ok(function)
         }
+        Node::StructDefinition { name, properties } => eval_type_definition(name, properties),
         Node::CallExpression {
             function,
             arguments,
@@ -478,6 +479,25 @@ fn eval_member_expression(instance: &mut Object, member: &Node) -> Result<Object
         member
     };
     eval(member, env)
+}
+
+fn eval_type_definition(name: &Node, properties_list: &Vec<Node>) -> Result<Object, String> {
+    let name = if let Node::Identifier { value } = name {
+        Some(value.clone())
+    } else {
+        return Err(format!("Expected identifier, but got {}", name.string()));
+    };
+    let mut properties = HashMap::new();
+    for property in properties_list {
+        // just support identifier(property name) now, ignore property type 
+        let prop_name = if let Node::Identifier { value } = property {
+            value
+        } else {
+            return Err(format!("Expected identifier, but got {}", property.string()));
+        };
+        properties.insert(prop_name.clone(), ObjectType::Any);
+    }
+    Ok(Object::new_custom_type_definition(name, properties))
 }
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
