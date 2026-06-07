@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     types::{Token, TokenType},
     util::emoji_convert::{boolean_to_emoji, float_to_emoji, integer_to_emoji},
@@ -92,6 +94,10 @@ pub enum Node {
     StructDefinition {
         name: Box<Node>,
         properties: Vec<Node>,
+    },
+    NewStructLiteral {
+        name: Box<Node>,
+        properties: HashMap<String, Node>,
     },
     PrefixExpression {
         operator: String,
@@ -195,6 +201,15 @@ impl Node {
                 properties
                     .iter()
                     .map(|ident| ident.string())
+                    .collect::<Vec<String>>()
+                    .join("🦶 "),
+            ),
+            Node::NewStructLiteral { name, properties } => format!(
+                "{} 🫸 {} 🫷",
+                name.string(),
+                properties
+                    .iter()
+                    .map(|(key, value)| format!("{} ➡️ {}", key, value.string()))
                     .collect::<Vec<String>>()
                     .join("🦶 "),
             ),
