@@ -1,7 +1,5 @@
 use std::{
-    collections::HashMap,
-    num::{ParseFloatError, ParseIntError},
-    rc::Rc,
+    collections::HashMap, num::{ParseFloatError, ParseIntError}, rc::Rc
 };
 
 use crate::{
@@ -129,6 +127,10 @@ impl Parser {
         );
 
         self.infix_exp_parsers.insert(
+            TokenType::LBrace,
+            Rc::new(|p, left| p.parse_new_struct_expression(left)),
+        );
+        self.infix_exp_parsers.insert(
             TokenType::LBracket,
             Rc::new(|p, left| p.parse_index_expression(left)),
         );
@@ -161,14 +163,11 @@ impl Parser {
     }
 
     fn parse_statement(&mut self) -> Result<Node, String> {
+        self.skip_current_semicolon();
         match self.tokens.current().unwrap().token_type {
             TokenType::Return => self.parse_return_statement(),
             TokenType::Break => self.parse_break_statement(),
             TokenType::Continue => self.parse_continue_statement(),
-            TokenType::Semicolon => {
-                self.tokens.to_next();
-                self.parse_statement()
-            }
             _ => self.parse_expression_statement(),
         }
     }
@@ -176,12 +175,7 @@ impl Parser {
     fn parse_return_statement(&mut self) -> Result<Node, String> {
         self.tokens.to_next();
         let value = Box::new(self.parse_expression(Precedence::Lowest)?);
-        while self
-            .tokens
-            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
-        {
-            self.tokens.to_next();
-        }
+        self.skip_next_semicolon();
 
         Ok(Node::ReturnStatement { value })
     }
@@ -195,23 +189,13 @@ impl Parser {
             None
         };
 
-        while self
-            .tokens
-            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
-        {
-            self.tokens.to_next();
-        }
+        self.skip_next_semicolon();
 
         Ok(Node::BreakStatement { value })
     }
 
     fn parse_continue_statement(&mut self) -> Result<Node, String> {
-        while self
-            .tokens
-            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
-        {
-            self.tokens.to_next();
-        }
+        self.skip_next_semicolon();
 
         Ok(Node::ContinueStatement)
     }
@@ -219,12 +203,7 @@ impl Parser {
     fn parse_expression_statement(&mut self) -> Result<Node, String> {
         let expression = Box::new(self.parse_expression(Precedence::Lowest)?);
 
-        while self
-            .tokens
-            .is_next_match(|tok| tok.token_type == TokenType::Semicolon)
-        {
-            self.tokens.to_next();
-        }
+        self.skip_next_semicolon();
 
         Ok(Node::ExpressionStatement { expression })
     }
@@ -626,11 +605,7 @@ impl Parser {
             }
             properties.push(self.parse_identifier()?);
 
-            while self
-                .tokens
-                .is_next_match(|token| token.token_type == TokenType::Semicolon) {
-                self.tokens.to_next();
-            }
+            self.skip_next_semicolon();
 
             if self
                 .tokens
@@ -649,6 +624,58 @@ impl Parser {
         }
 
         Ok(Node::StructDefinition { name, properties })
+    }
+
+    fn parse_new_struct_expression(&mut self, struct_name: Node) -> Result<Node, String> {
+        let mut entries = HashMap::new();
+        while self
+            .tokens
+            .to_next()
+            .filter(|token| token.token_type != TokenType::RBrace)
+            .is_some()
+        {
+            self.skip_current_semicolon();
+            
+            let key_token = self.tokens.current();
+
+            if key_token.is_none_or(|token| token.token_type != TokenType::Identifier) {
+                return Err(format!("Expected a identifier, but {}", 
+                    key_token.map_or(String::from("arrived at the end"), |tok| format!("got a {}", tok.literal))
+                ));
+            }
+
+            let key = key_token.unwrap().literal.clone();
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type != TokenType::Describe)
+            {
+                return Err(String::from("Expected a ➡️ between the property name and property value"));
+            }
+            self.tokens.to_next();
+            self.tokens.to_next();
+
+            let value = self.parse_expression(Precedence::Lowest)?;
+
+            entries.insert(key, value);
+
+            if self
+                .tokens
+                .is_next_match(|token| token.token_type == TokenType::RBrace)
+            {
+                continue;
+            }
+
+            if let Some(token) = self
+                .tokens
+                .to_next()
+                .filter(|token| token.token_type != TokenType::Comma)
+            {
+                return Err(format!("Expected a comma, but got a {}", token.literal));
+            }
+        }
+
+        Ok(Node::NewStructLiteral { name: Box::new(struct_name), properties: entries })
     }
 
     fn parse_index_expression(&mut self, list: Node) -> Result<Node, String> {
@@ -739,6 +766,22 @@ impl Parser {
             instance: Box::new(instance),
             member: Box::new(member),
         })
+    }
+
+    fn skip_current_semicolon(&mut self) {
+        while self
+            .tokens
+            .is_current_match(|token| token.token_type == TokenType::Semicolon) {
+            self.tokens.to_next();
+        }
+    }
+
+    fn skip_next_semicolon(&mut self) {
+        while self
+            .tokens
+            .is_next_match(|token| token.token_type == TokenType::Semicolon) {
+            self.tokens.to_next();
+        }
     }
 }
 

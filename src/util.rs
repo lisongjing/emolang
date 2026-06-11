@@ -75,6 +75,10 @@ impl<T: PartialEq> StatefulVector<T> {
         }
     }
 
+    pub fn is_current_match(&self, predicate: impl FnOnce(&T) -> bool) -> bool {
+        self.current().is_some_and(predicate)
+    }
+
     pub fn push(&mut self, element: T) {
         self.vector.push(element)
     }
