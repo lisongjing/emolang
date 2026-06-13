@@ -229,6 +229,13 @@ impl Object {
         )
     }
 
+    pub fn new_struct(value: HashMap<String, Object>) -> Object {
+        Self::new(
+            ObjectValue::Struct,
+            Environment::new_variables_and_builtins(value, &[]),
+        )
+    }
+
     pub fn new_butlin_function(value: BuiltinFunction) -> Object {
         Self::new(
             ObjectValue::BuiltinFunction(value),
@@ -348,7 +355,7 @@ pub struct Environment {
 
 impl Environment {
     pub fn new_default() -> Self {
-        Environment::new_builtins(&BuiltinFunction::EXPORTS)
+        Self::new_builtins(&BuiltinFunction::EXPORTS)
     }
 
     pub fn new_enclosed(outer: &Rc<RefCell<Environment>>) -> Self {
@@ -359,13 +366,15 @@ impl Environment {
     }
 
     pub fn new_builtins(builtin_functions: &[BuiltinFunction]) -> Self {
-        let mut map = HashMap::new();
+        Self::new_variables_and_builtins(HashMap::new(), builtin_functions)
+    }
 
+    pub fn new_variables_and_builtins(mut variables: HashMap<String, Object>, builtin_functions: &[BuiltinFunction]) -> Self {
         for function in builtin_functions {
-            map.insert(function.name(), Object::new_butlin_function(function.clone()));
+            variables.insert(function.name(), Object::new_butlin_function(function.clone()));
         }
 
-        Environment { map, outer: None }
+        Environment { map: variables, outer: None }
     }
 
     pub fn to_ref(self) -> Rc<RefCell<Environment>> {

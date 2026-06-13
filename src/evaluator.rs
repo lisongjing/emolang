@@ -48,7 +48,10 @@ pub fn eval(node: &Node, env: Rc<RefCell<Environment>>) -> Result<Object, String
             }
             Ok(function)
         }
-        Node::StructDefinition { name, properties } => eval_type_definition(name, properties),
+        Node::StructDefinition { name, properties } => eval_type_definition(name, properties, env),
+        Node::NewStructLiteral { name, properties } => {
+            eval_new_struct_instance(name, properties, env)
+        }
         Node::CallExpression {
             function,
             arguments,
@@ -481,7 +484,11 @@ fn eval_member_expression(instance: &mut Object, member: &Node) -> Result<Object
     eval(member, env)
 }
 
-fn eval_type_definition(name: &Node, properties_list: &Vec<Node>) -> Result<Object, String> {
+fn eval_type_definition(
+    name: &Node,
+    properties_list: &Vec<Node>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
     let name = if let Node::Identifier { value } = name {
         Some(value.clone())
     } else {
@@ -489,15 +496,70 @@ fn eval_type_definition(name: &Node, properties_list: &Vec<Node>) -> Result<Obje
     };
     let mut properties = HashMap::new();
     for property in properties_list {
-        // just support identifier(property name) now, ignore property type 
+        // just support identifier(property name) now, ignore property type
         let prop_name = if let Node::Identifier { value } = property {
             value
         } else {
-            return Err(format!("Expected identifier, but got {}", property.string()));
+            return Err(format!(
+                "Expected identifier, but got {}",
+                property.string()
+            ));
         };
         properties.insert(prop_name.clone(), ObjectType::Any);
     }
-    Ok(Object::new_custom_type_definition(name, properties))
+    let type_definition = Object::new_custom_type_definition(name.clone(), properties);
+    env.borrow_mut().set(
+        name.unwrap_or("anonymous".to_string()),
+        type_definition.clone(),
+    );
+    Ok(type_definition)
+}
+
+fn eval_new_struct_instance(
+    name: &Node,
+    init_properties: &HashMap<String, Node>,
+    env: Rc<RefCell<Environment>>,
+) -> Result<Object, String> {
+    let struct_definition = eval(name, env.clone())?;
+    if let ObjectValue::CustomTypeDefinition { name, properties } = struct_definition.value() {
+        let missing_props = properties
+            .keys()
+            .filter(|k| !init_properties.contains_key(*k))
+            .cloned()
+            .collect::<Vec<String>>();
+
+        if !missing_props.is_empty() {
+            return Err(format!(
+                "Missing properties: \"{}\" for struct {}",
+                missing_props.join(","),
+                name.clone().unwrap_or("anonymous".to_string())
+            ));
+        }
+
+        let unknown_props = init_properties
+            .keys()
+            .filter(|k| !properties.contains_key(*k))
+            .cloned()
+            .collect::<Vec<String>>();
+
+        if !unknown_props.is_empty() {
+            return Err(format!(
+                "Unknown properties: \"{}\" for struct {}",
+                unknown_props.join(","),
+                name.clone().unwrap_or("anonymous".to_string())
+            ));
+        }
+
+        let mut env_map = HashMap::new();
+        for (prop_name, prop_node) in init_properties {
+            let prop_obj = eval(prop_node, env.clone())?;
+            // todo check type compatibility: properties.get(name)
+            env_map.insert(prop_name.clone(), prop_obj);
+        }
+        Ok(Object::new_struct(env_map))
+    } else {
+        Err(format!("Can not find type {}", name.string()))
+    }
 }
 
 fn apply_function(function: Object, args: Vec<Object>) -> Result<Object, String> {
