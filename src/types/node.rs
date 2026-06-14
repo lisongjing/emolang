@@ -39,6 +39,7 @@ impl Precedence {
             TokenType::Modulo => Precedence::Product,
             TokenType::LParenthesis => Precedence::Call,
             TokenType::LBracket => Precedence::Index,
+            TokenType::LBrace => Precedence::Assign,
             TokenType::Member => Precedence::Index,
             _ => Precedence::Lowest,
         }

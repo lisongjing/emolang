@@ -520,7 +520,7 @@ fn eval_new_struct_instance(
     init_properties: &HashMap<String, Node>,
     env: Rc<RefCell<Environment>>,
 ) -> Result<Object, String> {
-    let struct_definition = eval(name, env.clone())?;
+    let struct_definition = eval(name, Rc::clone(&env))?;
     if let ObjectValue::CustomTypeDefinition { name, properties } = struct_definition.value() {
         let missing_props = properties
             .keys()
@@ -552,7 +552,7 @@ fn eval_new_struct_instance(
 
         let mut env_map = HashMap::new();
         for (prop_name, prop_node) in init_properties {
-            let prop_obj = eval(prop_node, env.clone())?;
+            let prop_obj = eval(prop_node, Rc::clone(&env))?;
             // todo check type compatibility: properties.get(name)
             env_map.insert(prop_name.clone(), prop_obj);
         }
