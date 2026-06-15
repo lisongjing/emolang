@@ -56,8 +56,9 @@ impl Hash for Object {
                     value.hash(state);
                 }
             }
-            ObjectValue::Struct => {
+            ObjectValue::Struct(struct_name) => {
                 7u32.hash(state);
+                struct_name.hash(state);
                 for (key, value) in self.associated_env.borrow().entries() {
                     key.hash(state);
                     value.hash(state);
@@ -124,8 +125,9 @@ impl Object {
                     .collect::<Vec<String>>()
                     .join(", ")
             ),
-            ObjectValue::Struct => format!(
-                "struct {{{}}}",
+            ObjectValue::Struct(struct_name) => format!(
+                "struct {} {{{}}}",
+                struct_name,
                 self.associated_env
                     .borrow()
                     .entries()
@@ -151,7 +153,7 @@ impl Object {
                 val.name()
             ),
             // ObjectValue::Reference(val) => val.borrow().inspect(),
-            ObjectValue::CustomTypeDefinition { name, properties: _ } => format!("type {}", name.clone().unwrap_or("anonymous".to_string())),
+            ObjectValue::CustomTypeDefinition { name, properties: _ } => format!("type {}", name),
             ObjectValue::ReturnValue(val) => val.inspect(),
             ObjectValue::Break(val) => val.clone().map_or("!".to_string(), |v| v.inspect()),
             ObjectValue::Continue => "!".to_string(),
@@ -229,9 +231,9 @@ impl Object {
         )
     }
 
-    pub fn new_struct(value: HashMap<String, Object>) -> Object {
+    pub fn new_struct(struct_name:String, value: HashMap<String, Object>) -> Object {
         Self::new(
-            ObjectValue::Struct,
+            ObjectValue::Struct(struct_name),
             Environment::new_variables_and_builtins(value, &[]),
         )
     }
@@ -261,7 +263,7 @@ impl Object {
     //     )
     // }
 
-    pub fn new_custom_type_definition(name: Option<String>, properties: HashMap<String, ObjectType>) -> Object {
+    pub fn new_custom_type_definition(name: String, properties: HashMap<String, ObjectType>) -> Object {
         Self::new(
             ObjectValue::CustomTypeDefinition { name, properties },
             Environment::new_builtins(&[]),
@@ -300,7 +302,7 @@ pub enum ObjectValue {
     Null,
     List(Vec<Object>),
     Map(HashMap<Object, Object>),
-    Struct,
+    Struct(String),
     Function {
         parameters: Vec<Node>,
         body: Box<Node>,
@@ -309,7 +311,7 @@ pub enum ObjectValue {
     BuiltinFunction(BuiltinFunction),
     // Reference(Rc<RefCell<Object>>),
     CustomTypeDefinition {
-        name: Option<String>,
+        name: String,
         properties: HashMap<String, ObjectType>,
     },
     ReturnValue(Box<Object>),

@@ -490,7 +490,7 @@ fn eval_type_definition(
     env: Rc<RefCell<Environment>>,
 ) -> Result<Object, String> {
     let name = if let Node::Identifier { value } = name {
-        Some(value.clone())
+        value.clone()
     } else {
         return Err(format!("Expected identifier, but got {}", name.string()));
     };
@@ -509,7 +509,7 @@ fn eval_type_definition(
     }
     let type_definition = Object::new_custom_type_definition(name.clone(), properties);
     env.borrow_mut().set(
-        name.unwrap_or("anonymous".to_string()),
+        name,
         type_definition.clone(),
     );
     Ok(type_definition)
@@ -532,7 +532,7 @@ fn eval_new_struct_instance(
             return Err(format!(
                 "Missing properties: \"{}\" for struct {}",
                 missing_props.join(","),
-                name.clone().unwrap_or("anonymous".to_string())
+                name
             ));
         }
 
@@ -546,7 +546,7 @@ fn eval_new_struct_instance(
             return Err(format!(
                 "Unknown properties: \"{}\" for struct {}",
                 unknown_props.join(","),
-                name.clone().unwrap_or("anonymous".to_string())
+                name
             ));
         }
 
@@ -556,7 +556,7 @@ fn eval_new_struct_instance(
             // todo check type compatibility: properties.get(name)
             env_map.insert(prop_name.clone(), prop_obj);
         }
-        Ok(Object::new_struct(env_map))
+        Ok(Object::new_struct(name.clone(), env_map))
     } else {
         Err(format!("Can not find type {}", name.string()))
     }
